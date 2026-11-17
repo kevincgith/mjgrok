@@ -1,10 +1,20 @@
 import { describe, expect, it } from 'vitest'
 import { parseHand } from './notation.ts'
 import { scoreHand } from './scoring.ts'
-import { shanten } from './shanten.ts'
+import { shanten, shantenOfCounts } from './shanten.ts'
 import { findWaits } from './waits.ts'
 import { resolveEightFill, resolveOrphanFill, resolveSixteenFill } from './specials.ts'
 import { countsOf, kindIndex } from './tiles.ts'
+
+function mulberry(seed: number) {
+  let s = seed >>> 0
+  return () => {
+    s = (s + 0x6d2b79f5) >>> 0
+    let t = Math.imul(s ^ (s >>> 15), 1 | s)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
 
 function counts(text: string) {
   const { counts: c, jokers } = countsOf(parseHand(text).concealed)
@@ -44,6 +54,34 @@ describe('jokers on special hands', () => {
     expect(resolveSixteenFill(c, jokers)?.standIns.length).toBeGreaterThan(0)
     const scored = scoreHand(parseHand('147m147t147b1234567zj'))
     expect(scored[0]?.matches.some((m) => m.id === 'sixteen' || m.id === 'sixteen-fly')).toBe(true)
+  })
+
+  it('matches a concrete stand-in on seeded joker tenpai hands', () => {
+    const rand = mulberry(20261117)
+    for (let n = 0; n < 20; n++) {
+      const counts = new Array<number>(34).fill(0)
+      const kinds: number[] = []
+      while (kinds.length < 13) {
+        const idx = Math.floor(rand() * 9)
+        if (counts[idx] >= 4) continue
+        counts[idx] += 1
+        kinds.push(idx)
+      }
+      const hand = parseHand(kinds.map((i) => `${(i % 9) + 1}m`).join('') + 'j')
+      const value = shanten(hand, { meldsNeeded: 4 })
+      const filled = counts.slice()
+      // The joker can stand in for any kind still under the copy cap, so the
+      // joker hand is never farther from tenpai than the best single fill.
+      let best = 8
+      for (let i = 0; i < 9; i++) {
+        if (filled[i] >= 4) continue
+        filled[i] += 1
+        best = Math.min(best, shantenOfCounts(filled, 0, 4))
+        filled[i] -= 1
+      }
+      expect(value).toBeLessThanOrEqual(best)
+      expect(value).toBeGreaterThanOrEqual(best - 1)
+    }
   })
 
   it('rejects a fifth copy even when a joker could pretend to be that kind', () => {
