@@ -64,19 +64,28 @@ export function ScoringPage() {
   useEffect(() => { localStorage.setItem('mjwaits.recentScoring', JSON.stringify(recent)) }, [recent])
   const fingerprint = compile(rules).fingerprint
   useEffect(() => {
-    const hash = location.hash.replace(/^#/, '')
-    const params = new URLSearchParams(hash)
-    const rule = params.get('r')
-    if (rule) {
-      try { setRules(JSON.parse(rule) as RuleDiff) } catch { setToast('This rule link could not be read.') }
+    const load = () => {
+      const hash = location.hash.replace(/^#/, '')
+      const params = new URLSearchParams(hash)
+      const rule = params.get('r')
+      if (rule) {
+        try { setRules(JSON.parse(rule) as RuleDiff) } catch { setToast('This rule link could not be read.') }
+      }
+      if (!params.get('t')) return
+      try {
+        const next = parseHand(params.get('t') ?? '')
+        setConcealed(next.concealed.map(kindOf))
+        setFlowers(next.flowers.map(kindOf))
+        setDeclared(next.declared.map((m) => ({ type: m.type === 'chow' ? 'chow' : m.type === 'pung' ? 'pung' : m.type === 'open-kong' ? 'open-kong' : 'closed-kong', tiles: m.tiles.map(kindOf) })))
+        setWinning(next.winningTile ? kindOf(next.winningTile) : null)
+        setSit({ ...defaultSituation(), ...parseSituationQuery(params.get('s') ?? '') })
+      } catch (err) {
+        setToast(err instanceof Error ? err.message : 'This hand link could not be read.')
+      }
     }
-    if (!params.get('t')) return
-    const hand = parseHand(params.get('t') ?? '')
-    setConcealed(hand.concealed.map(kindOf))
-    setFlowers(hand.flowers.map(kindOf))
-    setDeclared(hand.declared.map((m) => ({ type: m.type === 'chow' ? 'chow' : m.type === 'pung' ? 'pung' : m.type === 'open-kong' ? 'open-kong' : 'closed-kong', tiles: m.tiles.map(kindOf) })))
-    setWinning(hand.winningTile ? kindOf(hand.winningTile) : null)
-    setSit({ ...defaultSituation(), ...parseSituationQuery(params.get('s') ?? '') })
+    load()
+    window.addEventListener('hashchange', load)
+    return () => window.removeEventListener('hashchange', load)
   }, [])
 
   const caps = { flowers: flowers.length, kongs: declared.filter((m) => m.type === 'open-kong' || m.type === 'closed-kong').length }

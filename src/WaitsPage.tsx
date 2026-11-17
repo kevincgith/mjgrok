@@ -10,10 +10,15 @@ export function WaitsPage() {
   const [breakDown, setBreakDown] = useState(false)
   const [toast, setToast] = useState('')
   useEffect(() => {
-    const params = new URLSearchParams(location.hash.replace(/^#/, ''))
-    const raw = params.get('w')
-    if (!raw) return
-    try { sync(parseNotation(raw)) } catch { setToast('This wait link could not be read.') }
+    const load = () => {
+      const params = new URLSearchParams(location.hash.replace(/^#/, ''))
+      const raw = params.get('w')
+      if (!raw) return
+      try { sync(parseNotation(raw)) } catch { setToast('This wait link could not be read.') }
+    }
+    load()
+    window.addEventListener('hashchange', load)
+    return () => window.removeEventListener('hashchange', load)
   }, [])
   const hand = { concealed: tiles, declared: [], flowers: [] }
   const result = useMemo(() => findWaits(hand), [tiles])
