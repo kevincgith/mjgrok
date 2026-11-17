@@ -20,6 +20,14 @@ export interface LedgerSettings {
   surrenderHint: number
   falseWinPenalty: number
   dollarPerFarn: number
+  bonuses: Record<string, number>
+}
+
+export interface PatternUse {
+  id: string
+  nameZh: string
+  tai: number
+  count: number
 }
 
 export type BonusMode = 'reward' | 'penalty' | 'transfer'
@@ -27,12 +35,14 @@ export type BonusMode = 'reward' | 'penalty' | 'transfer'
 export type LedgerEvent =
   | { type: 'setup'; players: LedgerPlayer[]; dealerId: string; settings?: Partial<LedgerSettings> }
   | { type: 'settings'; settings: Partial<LedgerSettings> }
-  | { type: 'win'; winnerId: string; selfDraw: boolean; discarderId?: string; farn: number; multi?: 'none' | 'double' | 'triple'; takeJackpot?: boolean }
-  | { type: 'multi'; discarderId: string; winners: { id: string; farn: number }[]; takeJackpot?: boolean }
+  | { type: 'win'; winnerId: string; selfDraw: boolean; discarderId?: string; farn: number; multi?: 'none' | 'double' | 'triple'; takeJackpot?: boolean; patterns?: PatternUse[] }
+  | { type: 'multi'; discarderId: string; winners: { id: string; farn: number; patterns?: PatternUse[] }[]; takeJackpot?: boolean }
   | { type: 'draw' }
   | { type: 'bonus'; label: string; amount: number; playerId?: string; fromId?: string; toId?: string; mode: BonusMode }
   | { type: 'surrender'; playerId: string }
-  | { type: 'seats'; order: string[] }
+  | { type: 'seats'; order: string[]; winds?: Record<string, 1 | 2 | 3 | 4> }
+  | { type: 'swap'; a: string; b: string }
+  | { type: 'substitute'; outId: string; player: LedgerPlayer }
   | { type: 'dealer'; dealerId?: string; streak?: number; roundWind?: 1 | 2 | 3 | 4; roundIndex?: number }
   | { type: 'jackpot'; toId: string; amount?: number }
 
@@ -65,6 +75,14 @@ export interface LedgerState {
   seatPrompt: boolean
   surrenderCounts: Record<string, number>
   label: string
+  /** Every identity that has sat, including players who left. Totals stay on the id. */
+  roster: LedgerPlayer[]
+  winds: Record<string, 1 | 2 | 3 | 4>
+  patternCounts: Record<string, Record<string, number>>
+  wins: Record<string, number>
+  /** Cumulative amount `from` has paid `to` across wins, snow, and bonuses. */
+  paid: Record<string, Record<string, number>>
+  hands: { type: string; deltas: Record<string, number> }[]
 }
 
 export const defaultLedgerSettings = (): LedgerSettings => ({
@@ -83,6 +101,20 @@ export const defaultLedgerSettings = (): LedgerSettings => ({
   surrenderHint: 3,
   falseWinPenalty: 40,
   dollarPerFarn: 1,
+  bonuses: {
+    flower: 5,
+    grass: 3,
+    both: 8,
+    concealedKong: 5,
+    chase5: 5,
+    chase10: 10,
+    snake: 5,
+    box: 5,
+    sevenRobOne: 30,
+    oneRobSeven: 30,
+    eightImmortals: 100,
+    falseCall: 5,
+  },
 })
 
 const WIND = ['東', '南', '西', '北']
@@ -115,7 +147,27 @@ function blank(players: LedgerPlayer[], dealerId: string, settings: LedgerSettin
     seatPrompt: false,
     surrenderCounts,
     label: roundLabel(1, 0),
+    roster: players.map((p) => ({ ...p })),
+    winds: {},
+    patternCounts: {},
+    wins: {},
+    paid: {},
+    hands: [],
   }
+}
+
+function owe(state: LedgerState, from: string, to: string, amount: number): void {
+  if (amount === 0 || from === to) return
+  const row = state.paid[from] ?? {}
+  row[to] = (row[to] ?? 0) + amount
+  state.paid[from] = row
+}
+
+function notePatterns(state: LedgerState, playerId: string, patterns: PatternUse[] | undefined): void {
+  if (!patterns) return
+  const row = state.patternCounts[playerId] ?? {}
+  for (const pattern of patterns) row[pattern.id] = (row[pattern.id] ?? 0) + pattern.count
+  state.patternCounts[playerId] = row
 }
 
 function money(n: number, settings: LedgerSettings): number {
@@ -189,6 +241,7 @@ function applyWinPair(state: LedgerState, winnerId: string, payerId: string, far
   state.claims = paid.claims
   touch(deltas, payerId, -paid.worth)
   touch(deltas, winnerId, paid.worth)
+  owe(state, payerId, winnerId, paid.worth)
 }
 
 function foldSnow(state: LedgerState, winnerId: string, deltas: Record<string, number>): void {
@@ -198,6 +251,7 @@ function foldSnow(state: LedgerState, winnerId: string, deltas: Record<string, n
     const amount = snow.amountEach
     touch(deltas, fromId, -amount)
     touch(deltas, winnerId, amount)
+    owe(state, fromId, winnerId, amount)
     const claim = state.claims.find((c) => c.holderId === winnerId && c.targetId === fromId)
     if (claim) claim.value = money(claim.value + amount, state.settings)
     else state.claims.push({ holderId: winnerId, targetId: fromId, value: amount })
@@ -228,6 +282,7 @@ function passDealer(state: LedgerState): void {
 function commit(state: LedgerState, deltas: Record<string, number>): void {
   for (const [id, amount] of Object.entries(deltas)) state.nets[id] = money((state.nets[id] ?? 0) + amount, state.settings)
   state.lastDeltas = deltas
+  state.hands.push({ type: 'hand', deltas: { ...deltas } })
   state.handNumber += 1
   state.label = roundLabel(state.roundWind, state.roundIndex)
 }
@@ -240,7 +295,11 @@ function apply(state: LedgerState, event: LedgerEvent): void {
     return
   }
   if (event.type === 'settings') {
-    state.settings = { ...state.settings, ...event.settings }
+    state.settings = {
+      ...state.settings,
+      ...event.settings,
+      bonuses: { ...state.settings.bonuses, ...(event.settings.bonuses ?? {}) },
+    }
     state.lastDeltas = {}
     return
   }
@@ -267,6 +326,8 @@ function apply(state: LedgerState, event: LedgerEvent): void {
     if (event.takeJackpot) takePot(state, event.winnerId, deltas)
     if (event.winnerId === state.dealerId) state.streak += 1
     else passDealer(state)
+    state.wins[event.winnerId] = (state.wins[event.winnerId] ?? 0) + 1
+    notePatterns(state, event.winnerId, event.patterns)
     commit(state, deltas)
     return
   }
@@ -286,6 +347,10 @@ function apply(state: LedgerState, event: LedgerEvent): void {
     if (event.takeJackpot && event.winners[0]) takePot(state, event.winners[0].id, deltas)
     if (event.winners.some((w) => w.id === state.dealerId)) state.streak += 1
     else passDealer(state)
+    for (const winner of event.winners) {
+      state.wins[winner.id] = (state.wins[winner.id] ?? 0) + 1
+      notePatterns(state, winner.id, winner.patterns)
+    }
     commit(state, deltas)
     return
   }
@@ -300,15 +365,18 @@ function apply(state: LedgerState, event: LedgerEvent): void {
     if (event.mode === 'transfer' && event.fromId && event.toId) {
       touch(deltas, event.fromId, -event.amount)
       touch(deltas, event.toId, event.amount)
+      owe(state, event.fromId, event.toId, event.amount)
     } else if (event.mode === 'penalty' && event.playerId) {
       for (const id of others) {
         touch(deltas, event.playerId, -event.amount)
         touch(deltas, id, event.amount)
+        owe(state, event.playerId, id, event.amount)
       }
     } else if (event.playerId) {
       for (const id of others) {
         touch(deltas, id, -event.amount)
         touch(deltas, event.playerId, event.amount)
+        owe(state, id, event.playerId, event.amount)
       }
     }
     commit(state, deltas)
@@ -322,6 +390,29 @@ function apply(state: LedgerState, event: LedgerEvent): void {
   }
   if (event.type === 'seats') {
     state.seatOrder = event.order.slice()
+    if (event.winds) state.winds = { ...event.winds }
+    state.lastDeltas = {}
+    return
+  }
+  if (event.type === 'swap') {
+    const order = state.seatOrder.slice()
+    const i = order.indexOf(event.a)
+    const j = order.indexOf(event.b)
+    if (i >= 0 && j >= 0) {
+      order[i] = event.b
+      order[j] = event.a
+      state.seatOrder = order
+    }
+    state.lastDeltas = {}
+    return
+  }
+  if (event.type === 'substitute') {
+    const seat = state.seatOrder.indexOf(event.outId)
+    if (seat >= 0) state.seatOrder[seat] = event.player.id
+    if (!state.roster.some((p) => p.id === event.player.id)) state.roster.push({ ...event.player })
+    if (state.nets[event.player.id] == null) state.nets[event.player.id] = 0
+    if (state.dealerId === event.outId) state.dealerId = event.player.id
+    state.players = state.seatOrder.map((id) => state.roster.find((p) => p.id === id) ?? { id, name: id })
     state.lastDeltas = {}
     return
   }

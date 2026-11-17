@@ -117,6 +117,34 @@ describe('ledger', () => {
     expect(ledgerZeroSum(state)).toBe(0)
   })
 
+  it('keeps a substituted player\'s total on their identity and does not move it on a seat swap', () => {
+    const state = replayLedger([
+      { type: 'setup', players, dealerId: 'a', settings: quiet },
+      { type: 'win', winnerId: 'a', selfDraw: true, farn: 10, patterns: [{ id: 'all-pungs', nameZh: '對對胡', tai: 40, count: 1 }] },
+      { type: 'substitute', outId: 'a', player: { id: 'e', name: 'E' } },
+      { type: 'swap', a: 'e', b: 'b' },
+    ])
+    expect(state.nets.a).toBe(30)
+    expect(state.nets.e).toBe(0)
+    expect(state.seatOrder[state.seatOrder.indexOf('b')]).toBe('b')
+    expect(state.seatOrder).toContain('e')
+    expect(state.seatOrder).not.toContain('a')
+    expect(state.roster.map((p) => p.id)).toContain('a')
+    expect(state.wins.a).toBe(1)
+    expect(state.patternCounts.a['all-pungs']).toBe(1)
+    expect(state.paid.b.a).toBe(10)
+    expect(ledgerZeroSum(state)).toBe(0)
+    const swapped = state.seatOrder
+    const again = replayLedger([
+      { type: 'setup', players, dealerId: 'a', settings: quiet },
+      { type: 'win', winnerId: 'a', selfDraw: true, farn: 10 },
+      { type: 'substitute', outId: 'a', player: { id: 'e', name: 'E' } },
+      { type: 'swap', a: 'e', b: 'b' },
+    ])
+    expect(again.seatOrder).toEqual(swapped)
+    expect(again.nets).toEqual(state.nets)
+  })
+
   it('settles with the fewest payments', () => {
     const payments = fewestPayments({ a: 30, b: -10, c: -20, d: 0 })
     expect(payments).toHaveLength(2)
