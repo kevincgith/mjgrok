@@ -9,6 +9,9 @@ import {
   preEightWaitCount,
   ranksAreSame,
   ranksCoverOneToNine,
+  resolveEightFill,
+  resolveOrphanFill,
+  resolveSixteenFill,
   sixteenPairAndRanks,
 } from './specials.ts'
 import { findWaits, markWinning } from './waits.ts'
@@ -46,6 +49,8 @@ interface Ctx {
   winning: Kind | null
   selfDraw: boolean
   waitKinds: Kind[] | null
+  /** Concrete tile counts after jokers have been assigned a stand-in. */
+  resolvedCounts?: number[]
 }
 
 const NONE: Hit = { count: 0, rows: [] }
@@ -220,30 +225,41 @@ function scoreSpecials(
   waitKinds: Kind[] | null,
 ): ScoreResult[] {
   const { counts, jokers } = countsOf(hand.concealed)
-  if (jokers > 0) return []
   const out: ScoreResult[] = []
-  if (isThirteenOrphansComplete(counts, 0)) {
-    const reading = orphanReading(counts)
+  if (isThirteenOrphansComplete(counts, jokers)) {
+    const fill = resolveOrphanFill(counts, jokers)
+    const reading = fill ? orphanReading(fill.counts, fill.standIns) : orphanReading(counts, [])
     if (reading) {
       markWinning(reading.melds, reading.pair, winning, selfDraw)
-      out.push(settle(collect({ hand, sit, rules, melds: reading.melds, pair: reading.pair, shape: 'orphans', winning, selfDraw, waitKinds }), rules, 'orphans', reading, false))
+      out.push(settle(collect({ hand, sit, rules, melds: reading.melds, pair: reading.pair, shape: 'orphans', winning, selfDraw, waitKinds, resolvedCounts: fill?.counts }), rules, 'orphans', reading, false))
     }
   }
-  if (isSixteenUnrelatedComplete(counts, 0)) {
-    const info = sixteenPairAndRanks(counts)
+  if (isSixteenUnrelatedComplete(counts, jokers)) {
+    const fill = resolveSixteenFill(counts, jokers)
+    const info = fill ? { pair: indexKind(fill.pair), ranks: fill.ranks } : sixteenPairAndRanks(counts)
+    const source = fill?.counts ?? counts
     if (info) {
       const melds: ResolvedMeld[] = []
       for (let i = 0; i < 34; i++) {
-        if (counts[i] === 1) {
+        if (source[i] === 1) {
           melds.push({ type: 'single', tiles: [indexKind(i)], concealed: true, open: false, declared: false, jokerSlots: [] })
         }
       }
-      const decomp: ResolvedDecomposition = { melds, pair: [info.pair, info.pair], pairJokers: 0, shape: 'unrelated', jokerStandIns: [] }
-      out.push(settle(collect({ hand, sit, rules, melds, pair: decomp.pair, shape: 'unrelated', winning, selfDraw, waitKinds }), rules, 'unrelated', decomp, false))
+      const pairKind = typeof info.pair === 'string' ? info.pair : indexKind(info.pair)
+      const decomp: ResolvedDecomposition = {
+        melds,
+        pair: [pairKind, pairKind],
+        pairJokers: 0,
+        shape: 'unrelated',
+        jokerStandIns: (fill?.standIns ?? []).map(indexKind),
+      }
+      out.push(settle(collect({ hand, sit, rules, melds, pair: decomp.pair, shape: 'unrelated', winning, selfDraw, waitKinds, resolvedCounts: source }), rules, 'unrelated', decomp, false))
     }
   }
-  if (isEightPairsComplete(counts, 0)) {
-    const groups = eightGroups(counts)
+  if (isEightPairsComplete(counts, jokers)) {
+    const fill = resolveEightFill(counts, jokers)
+    const use = fill?.counts ?? counts
+    const groups = eightGroups(use)
     const melds: ResolvedMeld[] = []
     const seen = new Set<string>()
     for (const kind of groups.pairKinds) {
@@ -259,13 +275,13 @@ function scoreSpecials(
       melds.push({ type: 'pung', tiles: [groups.triple, groups.triple, groups.triple], concealed: true, open: false, declared: false, jokerSlots: [] })
     }
     const pairKind = groups.triple ?? groups.pairKinds[0]
-    const decomp: ResolvedDecomposition = { melds, pair: [pairKind, pairKind], pairJokers: 0, shape: 'eight', jokerStandIns: [] }
-    out.push(settle(collect({ hand, sit, rules, melds, pair: decomp.pair, shape: 'eight', winning, selfDraw, waitKinds }), rules, 'eight', decomp, false))
+    const decomp: ResolvedDecomposition = { melds, pair: [pairKind, pairKind], pairJokers: 0, shape: 'eight', jokerStandIns: (fill?.standIns ?? []).map(indexKind) }
+    out.push(settle(collect({ hand, sit, rules, melds, pair: decomp.pair, shape: 'eight', winning, selfDraw, waitKinds, resolvedCounts: use }), rules, 'eight', decomp, false))
   }
   return out
 }
 
-function orphanReading(counts: number[]): ResolvedDecomposition | null {
+function orphanReading(counts: number[], standIns: number[] = []): ResolvedDecomposition | null {
   for (let i = 0; i < 34; i++) {
     if (counts[i] < 3) continue
     const next = counts.slice()
@@ -282,7 +298,7 @@ function orphanReading(counts: number[]): ResolvedDecomposition | null {
       }
     }
     if (!pair) continue
-    return { melds, pair: [pair, pair], pairJokers: 0, shape: 'orphans', jokerStandIns: [] }
+    return { melds, pair: [pair, pair], pairJokers: 0, shape: 'orphans', jokerStandIns: standIns.map(indexKind) }
   }
   // run meld
   for (const base of [0, 9, 18]) {
@@ -301,7 +317,7 @@ function orphanReading(counts: number[]): ResolvedDecomposition | null {
         else if (next[k] === 1) melds.push({ type: 'single', tiles: [indexKind(k)], concealed: true, open: false, declared: false, jokerSlots: [] })
       }
       if (!pair) continue
-      return { melds, pair: [pair, pair], pairJokers: 0, shape: 'orphans', jokerStandIns: [] }
+      return { melds, pair: [pair, pair], pairJokers: 0, shape: 'orphans', jokerStandIns: standIns.map(indexKind) }
     }
   }
   return null
@@ -434,7 +450,7 @@ function collect(ctx: Ctx): Record<string, Hit> {
   }
   if (ctx.shape === 'eight') {
     set('eight', hit(1))
-    const counts = countsOf(ctx.hand.concealed).counts
+    const counts = ctx.resolvedCounts ?? countsOf(ctx.hand.concealed).counts
     const pre = ctx.winning ? counts.slice() : null
     if (pre && ctx.winning) {
       const idx = kindIndex(ctx.winning)
@@ -792,16 +808,16 @@ function straightHits(list: ResolvedMeld[]): Record<string, Hit> {
     if (!by.has(key.suit)) by.set(key.suit, new Map())
     by.get(key.suit)!.set(key.start, [...(by.get(key.suit)!.get(key.start) ?? []), meld])
   }
-  let so = 0
-  let sh = 0
-  let mo = 0
-  let mh = 0
+  const so: ResolvedMeld[][] = []
+  const sh: ResolvedMeld[][] = []
+  const mo: ResolvedMeld[][] = []
+  const mh: ResolvedMeld[][] = []
   let old = 0
   for (const suit of ['m', 't', 'b']) {
     const starts = by.get(suit) ?? new Map()
     const parts = splitOpen(product([starts.get(1) ?? [], starts.get(4) ?? [], starts.get(7) ?? []]))
-    so += parts.open.length
-    sh += parts.hidden.length
+    so.push(...parts.open)
+    sh.push(...parts.hidden)
     if ((starts.get(4) ?? []).length === 0) {
       old += (starts.get(1)?.length ?? 0) * (starts.get(7)?.length ?? 0)
     }
@@ -809,17 +825,16 @@ function straightHits(list: ResolvedMeld[]): Record<string, Hit> {
   for (const order of permutations(['m', 't', 'b'])) {
     const groups = [1, 4, 7].map((start, i) => by.get(order[i])?.get(start) ?? [])
     const parts = splitOpen(product(groups))
-    mo += parts.open.length
-    mh += parts.hidden.length
+    mo.push(...parts.open)
+    mh.push(...parts.hidden)
   }
-  let oldPung = 0
   return {
-    'straight-open': hit(so),
-    'straight-hidden': hit(sh),
-    'mixed-straight-open': hit(mo),
-    'mixed-straight-hidden': hit(mh),
+    'straight-open': hit(so.length, rowsOf(so)),
+    'straight-hidden': hit(sh.length, rowsOf(sh)),
+    'mixed-straight-open': hit(mo.length, rowsOf(mo)),
+    'mixed-straight-hidden': hit(mh.length, rowsOf(mh)),
     'old-young-run': hit(old),
-    'old-young-pung': hit(oldPung),
+    'old-young-pung': hit(0),
   }
 }
 
@@ -961,7 +976,7 @@ function coverage(ctx: Ctx, tiles: Kind[], flowers: { suit: string }[], set: (id
 
 function eyeHit(ctx: Ctx): Hit {
   if (ctx.shape === 'eight') {
-    const { counts } = countsOf(ctx.hand.concealed)
+    const counts = ctx.resolvedCounts ?? countsOf(ctx.hand.concealed).counts
     let n = 0
     const rows: Kind[][][] = []
     for (let i = 0; i < 27; i++) {
@@ -998,7 +1013,7 @@ function threeTreasures(tiles: Kind[], suits: Set<string>): boolean {
 function fakeSingle(ctx: Ctx): Hit {
   if (!ctx.winning) return NONE
   if (ctx.shape === 'eight') {
-    const { counts } = countsOf(ctx.hand.concealed)
+    const counts = ctx.resolvedCounts ?? countsOf(ctx.hand.concealed).counts
     const idx = kindIndex(ctx.winning)
     const triple = counts.some((c, i) => c === 3 && i !== idx)
     return hit(idx >= 0 && counts[idx] === 4 && triple ? 1 : 0)
@@ -1080,7 +1095,7 @@ function eightQuad(ctx: Ctx, counts: number[]): { open: Hit; hidden: Hit } {
 }
 
 function sixteenInfo(ctx: Ctx): { same: boolean; cover: boolean } {
-  const counts = countsOf(ctx.hand.concealed).counts
+  const counts = ctx.resolvedCounts ?? countsOf(ctx.hand.concealed).counts
   const info = sixteenPairAndRanks(counts)
   if (!info) return { same: false, cover: false }
   return { same: ranksAreSame(info.ranks), cover: ranksCoverOneToNine(info.ranks) }

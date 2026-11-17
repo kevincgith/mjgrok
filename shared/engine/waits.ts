@@ -5,6 +5,9 @@ import {
   isEightPairsComplete,
   isSixteenUnrelatedComplete,
   isThirteenOrphansComplete,
+  resolveEightFill,
+  resolveOrphanFill,
+  resolveSixteenFill,
   sixteenShapes,
 } from './specials.ts'
 import { shanten } from './shanten.ts'
@@ -87,9 +90,18 @@ function completions(
     for (const decomp of found.decomps) out.push(fromStandard(hand, decomp, winning, false))
   }
   if (specials && tiles === 17) {
-    if (isThirteenOrphansComplete(counts, jokers)) out.push(...orphanReadings(counts, winning))
-    if (isSixteenUnrelatedComplete(counts, jokers)) out.push(...sixteenReadings(counts))
-    if (isEightPairsComplete(counts, jokers)) out.push(eightReading(counts, winning))
+    if (isThirteenOrphansComplete(counts, jokers)) {
+      const fill = resolveOrphanFill(counts, jokers)
+      out.push(...orphanReadings(fill?.counts ?? counts, winning, fill?.standIns ?? []))
+    }
+    if (isSixteenUnrelatedComplete(counts, jokers)) {
+      const fill = resolveSixteenFill(counts, jokers)
+      out.push(...sixteenReadings(fill?.counts ?? counts, fill?.standIns ?? []))
+    }
+    if (isEightPairsComplete(counts, jokers)) {
+      const fill = resolveEightFill(counts, jokers)
+      out.push(eightReading(fill?.counts ?? counts, winning, fill?.standIns ?? []))
+    }
   }
   return out
 }
@@ -143,7 +155,7 @@ export function markWinning(melds: ResolvedMeld[], pair: Kind[], winning: Kind |
   if (chow) chow.open = true
 }
 
-function orphanReadings(counts: number[], winning: Kind): ResolvedDecomposition[] {
+function orphanReadings(counts: number[], winning: Kind, standIns: number[] = []): ResolvedDecomposition[] {
   const readings: ResolvedDecomposition[] = []
   for (const meld of ORDINARY_MELDS) {
     const next = counts.slice()
@@ -186,13 +198,13 @@ function orphanReadings(counts: number[], winning: Kind): ResolvedDecomposition[
     }
     const pair = [indexKind(extra), indexKind(extra)]
     markWinning(melds, pair, winning, false)
-    readings.push({ melds, pair, pairJokers: 0, shape: 'orphans', jokerStandIns: [] })
+    readings.push({ melds, pair, pairJokers: 0, shape: 'orphans', jokerStandIns: standIns.map(indexKind) })
     if (readings.length >= 8) break
   }
   return readings
 }
 
-function sixteenReadings(counts: number[]): ResolvedDecomposition[] {
+function sixteenReadings(counts: number[], standIns: number[] = []): ResolvedDecomposition[] {
   const out: ResolvedDecomposition[] = []
   for (const shape of sixteenShapes()) {
     let pairs = 0
@@ -222,13 +234,13 @@ function sixteenReadings(counts: number[]): ResolvedDecomposition[] {
         jokerSlots: [],
       }))
     const pairTiles = [indexKind(pair), indexKind(pair)]
-    out.push({ melds, pair: pairTiles, pairJokers: 0, shape: 'unrelated', jokerStandIns: [] })
+    out.push({ melds, pair: pairTiles, pairJokers: 0, shape: 'unrelated', jokerStandIns: standIns.map(indexKind) })
     if (out.length >= 4) break
   }
   return out
 }
 
-function eightReading(counts: number[], winning: Kind): ResolvedDecomposition {
+function eightReading(counts: number[], winning: Kind, standIns: number[] = []): ResolvedDecomposition {
   const groups = eightGroups(counts)
   const melds: ResolvedMeld[] = []
   const push = (kind: Kind, n: number) => {
@@ -249,5 +261,5 @@ function eightReading(counts: number[], winning: Kind): ResolvedDecomposition {
   if (groups.triple) push(groups.triple, 3)
   const pairKind = groups.triple ?? groups.pairKinds[0] ?? '1z'
   markWinning(melds, [pairKind, pairKind], winning, false)
-  return { melds, pair: [pairKind, pairKind], pairJokers: 0, shape: 'eight', jokerStandIns: [] }
+  return { melds, pair: [pairKind, pairKind], pairJokers: 0, shape: 'eight', jokerStandIns: standIns.map(indexKind) }
 }

@@ -354,15 +354,16 @@ function hasWait(counts: number[], jokers: number, need: number, specials: boole
 }
 
 function specialDistance(counts: number[], jokers: number): number {
-  if (jokers > 0) return 8
   const units = eightPairUnits(counts)
-  let eight = 8 - units.units
-  if (units.tiles === 16 && units.units >= 8 && units.singles === 0 && units.triples === 0) eight = 0
-  else if (eight < 1) eight = 2
+  const paired = Math.min(jokers, units.singles)
+  const spare = jokers - paired
+  let eight = 8 - (units.units + paired + Math.floor(spare / 2))
+  if (units.tiles + jokers === 16 && eight <= 0 && units.triples === 0) eight = 0
+  else if (eight < 1) eight = 1
   let present = 0
   for (const o of ORPHAN_INDEXES) if (counts[o] > 0) present += 1
-  const orphans = Math.max(1, 13 - present)
-  return Math.min(eight, orphans)
+  const orphans = Math.max(0, 13 - present - jokers)
+  return Math.min(Math.max(0, eight), orphans === 0 ? 0 : orphans)
 }
 
 function shantenCounts(counts: number[], jokers: number, need: number, checkpoint: number, specials: boolean): number {

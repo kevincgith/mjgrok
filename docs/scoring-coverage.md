@@ -1,6 +1,30 @@
 # Scoring coverage
 
-Each house pattern and the test that exercises it. Detection lives in `shared/engine/scoring.ts`; values and exclusions live in `shared/engine/taiCatalog.ts`.
+Detection lives in `shared/engine/scoring.ts`. Values and exclusions live in `shared/engine/taiCatalog.ts`.
+
+## Exact assertions
+
+These tests check a number, a missing pattern, or a repeated instance. A row in the table further down that only names `scoring.test.ts` means that file contains the id and, for most ids, an `expectHas` (tai greater than 0) or `expectLacks` inside a shared example. That is weaker than the cases in this list.
+
+| Test | What it asserts |
+|---|---|
+| `patternDepth.test.ts` pays pure all-runs | `123m456m789m123t456t99t` has 無字花大平胡 20, 底 5, 門前清 5, and lacks 平胡, 無字, 無花 |
+| `patternDepth.test.ts` two concealed straights | `123456789789m123t11t` has 暗清龍 count 2, tai 40, two instances, and lacks 明清龍 |
+| `patternDepth.test.ts` pung reading | `111222333444555m99t` keeps 對對胡 40 and lacks 平胡; every meld is a pung |
+| `patternDepth.test.ts` identical runs | open `(123m)123m…` is 明般高 5 and not 暗般高; concealed `123123m…` is 暗般高 8 |
+| `patternDepth.test.ts` flush negative | `123456789m456m111z99m` has 混一色 40 and lacks 清一色 |
+| `patternDepth.test.ts` disabled 大三元 | house hand has 大三元 80 and lacks 三元牌; value 0 on 大三元 restores 三元牌 count 3, tai 6 |
+| `patternDepth.test.ts` disabled 無字花 | value 0 on 無字花 and 無字花大平胡 lets 無花 and 無字 score 2 |
+| `patternDepth.test.ts` dual eight | `11122334455667788m` has a second reading, 嚦咕嚦咕 at least 50, and a total strictly larger than that reading |
+| `patternDepth.test.ts` sea one | winning 1筒 with sea-bottom and 自摸 is 海底撈月(一筒) 20 and lacks 海底撈月 |
+| `patternDepth.test.ts` five concealed | without 自摸, 坎坎胡 is absent; with 自摸 it is 160; a kong in place of a pung removes it |
+| `jokers.test.ts` eight | `1122m3344t5566b77z11zj` scores 嚦咕嚦咕 and the joker stand-in is 7z |
+| `jokers.test.ts` orphans | `1m19t19b1234567z777z1mj` scores 十三么 at least 160 and the stand-in includes 9m |
+| `jokers.test.ts` sixteen | `147m147t147b1234567zj` scores 十六不搭 or 十六飛 |
+| `basics.test.ts` seeded brute force | 40 one-suit hands, seed 20261117: engine shanten 0/1/>1 matches an independent tenpai check and a one-exchange check |
+| `ledger.test.ts` 反雪 and 封頂 | multi-ron by A, a draw, then A self-draws 5000 with limitInput 999; A’s net is above 5000, B and C are negative, zero-sum holds |
+
+The table below is the catalog index. It is not, by itself, evidence that every pattern has a negative hand and a repeat-count check.
 
 | id | 中文 | English | house value | covered by |
 |---|---|---|---|---|

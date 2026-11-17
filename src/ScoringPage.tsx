@@ -59,6 +59,10 @@ export function ScoringPage() {
   useEffect(() => {
     const hash = location.hash.replace(/^#/, '')
     const params = new URLSearchParams(hash)
+    const rule = params.get('r')
+    if (rule) {
+      try { setRules(JSON.parse(rule) as RuleDiff) } catch { setToast('This rule link could not be read.') }
+    }
     if (!params.get('t')) return
     const hand = parseHand(params.get('t') ?? '')
     setConcealed(hand.concealed.map(kindOf))
@@ -81,9 +85,14 @@ export function ScoringPage() {
     winningTile: winning ? toTile(winning) : null,
   }), [concealed, declared, flowers, winning])
   const scored = useMemo(() => {
-    try { return scoreHand(hand, live, rules.name === 'House' && !rules.values ? undefined : rules)[0] } catch { return undefined }
+    try {
+      return { result: scoreHand(hand, live, rules.name === 'House' && !rules.values ? undefined : rules)[0], error: '' }
+    } catch (err) {
+      return { result: undefined, error: err instanceof Error && err.message ? err.message : 'Scoring failed. The total is not available for this hand.' }
+    }
   }, [hand, live, rules])
-  const rows = [...(scored?.matches ?? [])]
+  const result = scored.result
+  const rows = [...(result?.matches ?? []), ...(result?.second?.matches ?? [])]
   if (sort === 'down') rows.sort((a, b) => b.tai - a.tai)
   if (sort === 'up') rows.sort((a, b) => a.tai - b.tai)
 
@@ -126,7 +135,7 @@ export function ScoringPage() {
         <button onClick={() => { if (!armed) { setArmed(true); return } setConcealed([]); setDeclared([]); setFlowers([]); setPending([]); setWinning(null); setArmed(false) }} className={armed ? 'danger-arm' : ''}>
           <Icon name="reset" size={18} /> Reset
         </button>
-        <strong className="score">{scored ? `${scored.total} 番` : '—'}</strong>
+        <strong className="score">{result ? `${result.total} 番` : scored.error ? 'Error' : '—'}</strong>
         <button onClick={() => setShowRules(true)}><Icon name="settings" size={18} /> 設定</button>
         <button onClick={share}><Icon name="share" size={18} /> Share</button>
       </div>
@@ -203,7 +212,7 @@ export function ScoringPage() {
       </div>
       <div className="card">
         <div className="row">
-          <h2>番 <span>{scored?.total ?? 0}</span></h2>
+          <h2>番 <span>{result?.total ?? 0}</span></h2>
           <button className={sort === 'order' ? 'on' : ''} onClick={() => setSort('order')}>Order</button>
           <button className={sort === 'down' ? 'on' : ''} onClick={() => setSort('down')}>番↓</button>
           <button className={sort === 'up' ? 'on' : ''} onClick={() => setSort('up')}>番↑</button>
@@ -218,14 +227,24 @@ export function ScoringPage() {
             ))}
           </div>
         ))}
-        {!rows.length && <p className="muted">{complete ? 'Not a complete hand yet.' : 'Add tiles to score.'}</p>}
+        {scored.error && <p className="bad">{scored.error}</p>}
+        {result?.second && <p className="muted">Eight pairs and the ordinary reading are both valid. The total adds them.</p>}
+        {!rows.length && !scored.error && <p className="muted">{complete ? 'Not a complete hand yet.' : 'Add tiles to score.'}</p>}
         <button style={{ marginTop: 8 }} onClick={() => setShowRecent(true)}>Recent</button>
       </div>
       {showRecent && (
         <div className="sheet-back" onClick={() => setShowRecent(false)}>
           <div className="sheet" onClick={(e) => e.stopPropagation()}>
             <h2>Recent</h2>
-            {recent.map((item) => <button key={item.id} onClick={() => { const hand = parseHand(item.notation); setConcealed(hand.concealed.map(kindOf)); setFlowers(hand.flowers.map(kindOf)); setShowRecent(false) }}>{item.notation}</button>)}
+            {recent.map((item) => <button key={item.id} onClick={() => {
+              const next = parseHand(item.notation)
+              setConcealed(next.concealed.map(kindOf))
+              setFlowers(next.flowers.map(kindOf))
+              setDeclared(next.declared.map((m) => ({ type: m.type === 'chow' ? 'chow' : m.type === 'pung' ? 'pung' : m.type === 'open-kong' ? 'open-kong' : 'closed-kong', tiles: m.tiles.map(kindOf) })))
+              setWinning(next.winningTile ? kindOf(next.winningTile) : null)
+              setSit({ ...defaultSituation(), ...parseSituationQuery(item.query) })
+              setShowRecent(false)
+            }}>{item.notation}</button>)}
             <button className={armed ? 'danger-arm' : ''} onClick={() => { if (!armed) { setArmed(true); return } setRecent([]); setArmed(false) }}>Clear</button>
           </div>
         </div>

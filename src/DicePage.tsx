@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { replayLedger, type LedgerEvent } from '@mjwaits/shared'
 
 function rot(face: number) {
   const map: Record<number, string> = { 1: 'rotateX(0deg)', 2: 'rotateY(-90deg)', 3: 'rotateX(-90deg)', 4: 'rotateX(90deg)', 5: 'rotateY(90deg)', 6: 'rotateX(180deg)' }
@@ -91,21 +92,80 @@ const STEPS = [
   'Move to the assigned seats, East at the bottom',
 ]
 
+const TILES = ['東', '南', '西', '北', '一筒', '二筒']
+
 function Seats() {
   const [step, setStep] = useState(0)
+  const [running, setRunning] = useState(false)
   const [names, setNames] = useState(['A', 'B', 'C', 'D'])
-  const [east, setEast] = useState(0)
+  const [editing, setEditing] = useState<number | null>(null)
+  const [provisional, setProvisional] = useState(0)
+  const [firstThrow, setFirstThrow] = useState(9)
+  const [secondThrow, setSecondThrow] = useState(7)
+  const [order, setOrder] = useState<number[]>([0, 1, 2, 3, 4, 5])
+  const [message, setMessage] = useState('')
+  const realEast = (provisional + firstThrow - 1) % 4
+  const reader = (realEast + secondThrow - 1) % 4
+  const fromTwo = secondThrow % 2 === 0
+  const windStart = fromTwo ? order.indexOf(5) : order.indexOf(4)
+  const winds = [0, 1, 2, 3].map((n) => TILES[order[(windStart + n) % 6]] ?? '東')
+  useEffect(() => {
+    if (!running) return
+    const delay = step === 0 || step === 2 ? 1400 : 1000
+    const timer = window.setTimeout(() => setStep((value) => Math.min(7, value + 1)), delay)
+    return () => window.clearTimeout(timer)
+  }, [running, step])
+  useEffect(() => { if (step >= 7) setRunning(false) }, [step])
+  function apply() {
+    const raw = localStorage.getItem('mjwaits.scores')
+    if (!raw) { setMessage('Start a ledger game before applying seats.'); return }
+    let store: { events: LedgerEvent[]; cursor: number }
+    try { store = JSON.parse(raw) as { events: LedgerEvent[]; cursor: number } } catch { setMessage('The ledger store could not be read.'); return }
+    const events = store.events.slice(0, store.cursor)
+    const state = replayLedger(events)
+    if (!state.players.length || !state.seatOrder.length) { setMessage('Start a ledger game before applying seats.'); return }
+    const bottom = state.seatOrder[0]
+    const eastPlayer = state.seatOrder[realEast] ?? bottom
+    const rotated = state.seatOrder.slice()
+    const at = rotated.indexOf(bottom)
+    const kept = at <= 0 ? rotated : [...rotated.slice(at), ...rotated.slice(0, at)]
+    const next = [...events, { type: 'seats' as const, order: kept }, { type: 'dealer' as const, dealerId: eastPlayer, streak: 0 }]
+    localStorage.setItem('mjwaits.scores', JSON.stringify({ events: next, cursor: next.length }))
+    setMessage(`Dealer is ${state.players.find((p) => p.id === eastPlayer)?.name ?? eastPlayer}. ${state.players.find((p) => p.id === bottom)?.name ?? 'Bottom'} stays at the bottom and neighbors stay in order.`)
+  }
   return (
     <div className="card">
       <div className="row">
         {names.map((name, i) => (
-          <button key={i} className={east === i ? 'on' : ''} onClick={() => setEast(i)}>{name}{east === i ? ' East' : ''}</button>
+          <button key={i} className={realEast === i ? 'on' : ''} onDoubleClick={() => { const swap = (i + 1) % 4; setNames(names.map((n, j) => j === i ? names[swap] : j === swap ? name : n)) }} onClick={() => { setProvisional(i); setEditing(i) }}>{name}{realEast === i ? ' 東' : ''}</button>
         ))}
       </div>
+      {editing !== null && <input aria-label="Seat name" value={names[editing]} onChange={(e) => setNames(names.map((n, i) => i === editing ? e.target.value || n : n))} />}
+      <div className="felt" style={{ minHeight: 160, position: 'relative', overflow: 'hidden' }}>
+        {TILES.map((label, i) => {
+          const slot = order.indexOf(i)
+          const placed = step >= 3
+          const split = step >= 4
+          const seated = step >= 7
+          const x = seated && i < 4 ? [50, 82, 50, 18][i] : split ? (slot < 3 ? 18 + slot * 14 : 58 + (slot - 3) * 14) : 12 + slot * 13
+          const y = seated && i < 4 ? [78, 50, 16, 50][i] : seated ? 46 : 46
+          return (
+            <div key={label} style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)', transition: 'left 0.8s ease, top 0.8s ease', width: 52, height: 72, borderRadius: 6, background: placed ? 'var(--tile)' : 'var(--tile-back)', borderBottom: '5px solid var(--tile-edge)', display: 'grid', placeItems: 'center', color: 'var(--ink)', fontWeight: 600 }}>
+              {placed ? label : ''}
+            </div>
+          )
+        })}
+      </div>
       <p><b>{STEPS[step]}</b></p>
-      <p className="muted">Step {step + 1} / 8. Count n seats counterclockwise: (seat + n - 1) mod 4.</p>
-      <button onClick={() => setStep((step + 1) % 8)}>Next</button>
-      <button onClick={() => setNames(names.map((n, i) => i === 0 ? n : n))}>Rename later from a long-press in a full session</button>
+      <p className="muted">Step {step + 1} / 8. First total {firstThrow} from {names[provisional]} lands on {names[realEast]}. Second total {secondThrow} reads from {fromTwo ? '二筒' : '一筒'} toward {names[reader]}.</p>
+      <div className="row">
+        <button className={running ? 'on' : ''} onClick={() => { if (step >= 7) setStep(0); setRunning(!running) }}>{running ? 'Pause' : 'Run'}</button>
+        <button onClick={() => { setRunning(false); setStep((value) => Math.min(7, value + 1)) }}>Next</button>
+        <button onClick={() => { setFirstThrow(3 + Math.floor(Math.random() * 16)); setSecondThrow(2 + Math.floor(Math.random() * 11)); setOrder([...order].sort(() => Math.random() - 0.5)) }}>Throw</button>
+        <button onClick={apply}>Apply to ledger</button>
+      </div>
+      <p className="muted">Winds {winds.join(' ')}. Long-press is a rename field; double-tap swaps a neighbor. East is counted {(firstThrow)} seats counterclockwise.</p>
+      {message && <p>{message}</p>}
     </div>
   )
 }

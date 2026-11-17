@@ -28,8 +28,8 @@ python3 scripts/fetch-tiles.py
 - Swap dice: Round is `((sum - 1) % 3) + 1` (always 1–3). Tiles is `floor(sum / 3)`. The screen shows both and their product.
 - Wall break: from the dealer, count players counterclockwise by the dice total (`(total - 1) % 4`). Count that many stacks clockwise along the chosen wall. `18 - total` stacks stay. A total of 12 breaks the left wall and leaves 6.
 - Ledger 拉: the first win records a claim equal to the plain payment (base + farn + dealer bonus + 雙響/三響). A repeat pays plain + half the claim, rounding 0.5 up, and the new claim is the old claim plus that worth. 踢 pays the same way, deletes the old claim, and the new claim starts at the plain amount only.
-- 封頂 is saved and shown. It does not cap a payment.
-- Jokers are wildcards with a concrete stand-in in each decomposition. Special-hand bonuses are not awarded while a joker is in the concealed tiles.
+- 封頂 is an input cap of 999. A payment larger than that is still paid in full. See `ledger.test.ts`.
+- Jokers are wildcards with a concrete stand-in. Eight pairs, thirteen orphans, and sixteen unrelated accept a joker in place of a missing tile. See `jokers.test.ts`.
 
 ## Credits
 

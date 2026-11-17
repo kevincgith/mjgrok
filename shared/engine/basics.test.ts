@@ -157,6 +157,27 @@ describe('brute-force cross check', () => {
     return false
   }
 
+  function exchangeReaches(source: number[], need: number, already: boolean): boolean {
+    if (already) return false
+    const c = source.slice()
+    for (let i = 0; i < 9; i++) {
+      if (!c[i]) continue
+      c[i] -= 1
+      for (let j = 0; j < 9; j++) {
+        if (c[j] >= 4) continue
+        c[j] += 1
+        const hit = bfTenpai(c, need)
+        c[j] -= 1
+        if (hit) {
+          c[i] += 1
+          return true
+        }
+      }
+      c[i] += 1
+    }
+    return false
+  }
+
   function mulberry(seed: number) {
     let s = seed >>> 0
     return () => {
@@ -182,18 +203,15 @@ describe('brute-force cross check', () => {
         c[idx] += 1
       }
       const engine = shantenOfCounts(c, 0, need)
-      const win = bfWin(
-        (() => {
-          // winning would be checkpoint+1; compare tenpai flag only
-          return c
-        })(),
-        need,
-      )
-      expect(win).toBe(false)
+      expect(bfWin(c, need)).toBe(false)
       const tenpai = bfTenpai(c, need)
+      const oneExchange = exchangeReaches(c, need, tenpai)
       if (tenpai) expect(engine).toBe(0)
-      else expect(engine).toBeGreaterThan(0)
+      else if (oneExchange) expect(engine).toBe(1)
+      else expect(engine).toBeGreaterThan(1)
       if (engine === 0) expect(tenpai).toBe(true)
+      if (engine === 1) expect(oneExchange).toBe(true)
+      if (engine > 1) expect(oneExchange).toBe(false)
     }
   })
 })

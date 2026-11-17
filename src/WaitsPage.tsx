@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
-import { analyzeDiscards, findWaits, formatNotation, parseNotation, shanten, type Tile } from '@mjwaits/shared'
+import { useEffect, useMemo, useState } from 'react'
+import { findWaits, formatNotation, parseNotation, scoreHand, shanten, type Tile } from '@mjwaits/shared'
 import { Icon, TileFace } from './ui'
+import { useDiscards } from './lib/useDiscards'
 
 export function WaitsPage() {
   const [tiles, setTiles] = useState<Tile[]>([])
@@ -8,9 +9,31 @@ export function WaitsPage() {
   const [sort, setSort] = useState(false)
   const [breakDown, setBreakDown] = useState(false)
   const [toast, setToast] = useState('')
+  useEffect(() => {
+    const params = new URLSearchParams(location.hash.replace(/^#/, ''))
+    const raw = params.get('w')
+    if (!raw) return
+    try { sync(parseNotation(raw)) } catch { setToast('This wait link could not be read.') }
+  }, [])
   const hand = { concealed: tiles, declared: [], flowers: [] }
   const result = useMemo(() => findWaits(hand), [tiles])
-  const discards = useMemo(() => (tiles.length > 0 && !result.atCheckpoint ? analyzeDiscards(hand).slice(0, 8) : result.atCheckpoint && result.shanten > 0 ? analyzeDiscards(hand).slice(0, 8) : []), [tiles, result.atCheckpoint, result.shanten])
+  const needDiscards = tiles.length > 0 && result.shanten >= 0 && !(result.atCheckpoint && result.shanten <= 0)
+  const discards = useDiscards(hand, needDiscards)
+  const projected = useMemo(() => {
+    if (!breakDown || result.shanten > 0) return new Map<string, number>()
+    const map = new Map<string, number>()
+    for (const wait of result.waits) {
+      if (wait.kind === 'j') continue
+      const tile = toTile(wait.kind)
+      try {
+        const scored = scoreHand({ concealed: [...tiles, tile], declared: [], flowers: [], winningTile: tile })[0]
+        if (scored) map.set(wait.kind, scored.total)
+      } catch {
+        map.set(wait.kind, -1)
+      }
+    }
+    return map
+  }, [breakDown, result, tiles])
   function sync(next: Tile[]) {
     setTiles(next)
     setText(formatNotation(next))
@@ -46,17 +69,19 @@ export function WaitsPage() {
           {breakDown && result.waits.map((w) => (
             <div key={w.kind}>
               <b>{w.kind}</b>
-              {w.decompositions.map((d, i) => <p key={i} className="muted">{d.shape}: {d.melds.map((m) => m.tiles.join('')).join(' ')} + {d.pair.join('')}</p>)}
+              {projected.get(w.kind) !== undefined && <p>{projected.get(w.kind)! < 0 ? 'Projected score failed' : `Projected ${projected.get(w.kind)} 番`}</p>}
+              {w.decompositions.map((d, i) => <p key={i} className="muted">{d.shape}: {d.melds.map((m) => m.tiles.join('')).join(' ')} + {d.pair.join('')}{d.jokerStandIns.length ? ` jokers ${d.jokerStandIns.join(' ')}` : ''}</p>)}
             </div>
           ))}
         </div>
       )}
       {result.shanten < 0 && <div className="card"><h2>Winning hand</h2><p>This hand is already complete.</p></div>}
-      {discards.length > 0 && (
+      {needDiscards && (
         <div className="card">
           <h2>{result.atCheckpoint ? 'Discard efficiency' : 'Discard options'}</h2>
-          <p className="muted">Percentages are an estimate over the next self-draws, not an exact probability.</p>
-          {discards.map((row) => (
+          <p className="muted">Percentages are an estimate over the next self-draws, not an exact probability. {discards.pending ? 'Working…' : discards.elapsedMs ? `Worker ${discards.elapsedMs} ms` : ''}</p>
+          {discards.error && <p className="bad">{discards.error}</p>}
+          {discards.rows.map((row) => (
             <p key={row.discard}><b>{row.discard}</b> tenpai {row.tenpaiPercent}% win {row.winPercent}% shanten {row.shanten}</p>
           ))}
         </div>
@@ -64,4 +89,9 @@ export function WaitsPage() {
       {toast && <div className="toast" onClick={() => setToast('')}>{toast}</div>}
     </section>
   )
+}
+
+function toTile(kind: string): Tile {
+  if (kind === 'j') return { suit: 'j', rank: 0 }
+  return { suit: kind.slice(-1) as Tile['suit'], rank: Number(kind.slice(0, -1)) }
 }

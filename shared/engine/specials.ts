@@ -255,3 +255,141 @@ export function preEightWaitCount(countsWithoutWin: number[]): number {
 export function kindLabel(kind: Kind): string {
   return `${rankOf(kind)}${suitOf(kind)}`
 }
+
+export interface JokerFill {
+  /** Concrete counts after each joker has been given a stand-in. */
+  counts: number[]
+  standIns: number[]
+}
+
+/** One concrete assignment of jokers that completes eight pairs. */
+export function resolveEightFill(counts: number[], jokers: number): JokerFill | null {
+  if (!isEightPairsComplete(counts, jokers)) return null
+  const adds = new Array<number>(KIND_COUNT).fill(0)
+  const rec = (i: number, j: number, units: number, triples: number, singles: number): boolean => {
+    if (units > 8 || triples > 1) return false
+    if (i === KIND_COUNT) {
+      if (singles > 0) return false
+      return placeFreeJokers(j, units, triples, adds)
+    }
+    const c = counts[i]
+    const maxAdd = Math.min(j, Math.max(0, 4 - c))
+    for (let add = 0; add <= maxAdd; add++) {
+      const n = c + add
+      let u = units
+      let t = triples
+      let s = singles
+      if (n === 1) s += 1
+      else if (n === 2) u += 1
+      else if (n === 3) {
+        u += 1
+        t += 1
+      } else if (n === 4) u += 2
+      else if (n > 4) continue
+      adds[i] = add
+      if (rec(i + 1, j - add, u, t, s)) return true
+    }
+    adds[i] = 0
+    return false
+  }
+  if (!rec(0, jokers, 0, 0, 0)) return null
+  const filled = counts.map((c, i) => c + adds[i])
+  const standIns: number[] = []
+  for (let i = 0; i < KIND_COUNT; i++) for (let k = 0; k < adds[i]; k++) standIns.push(i)
+  return { counts: filled, standIns }
+}
+
+function placeFreeJokers(jokers: number, units: number, triples: number, adds: number[]): boolean {
+  if (jokers === 0) return units === 8 && triples === 1
+  for (let i = 0; i < KIND_COUNT && jokers > 0; i++) {
+    const room = 4 - (adds[i])
+    if (room <= 0) continue
+    const take = Math.min(room, jokers >= 3 && triples === 0 ? 3 : jokers >= 2 ? 2 : 0)
+    if (take < 2 && !(take === 3)) continue
+    if (take === 0) continue
+    adds[i] += take
+    const nextUnits = units + (take === 4 ? 2 : 1)
+    const nextTriples = triples + (take === 3 ? 1 : 0)
+    if (placeFreeJokers(jokers - take, nextUnits, nextTriples, adds)) return true
+    adds[i] -= take
+  }
+  return false
+}
+
+export interface OrphanFill {
+  counts: number[]
+  standIns: number[]
+  meld: number[]
+  pair: number
+}
+
+export function resolveOrphanFill(counts: number[], jokers: number): OrphanFill | null {
+  if (!isThirteenOrphansComplete(counts, jokers)) return null
+  for (const meld of ORDINARY_MELDS) {
+    const next = counts.slice()
+    const standIns: number[] = []
+    let need = 0
+    for (const idx of meld) {
+      if (next[idx] > 0) next[idx] -= 1
+      else {
+        need += 1
+        standIns.push(idx)
+      }
+    }
+    if (need > jokers) continue
+    const core = assignOrphanCore(next, jokers - need)
+    if (!core) continue
+    const filled = counts.slice()
+    for (const idx of standIns) filled[idx] += 1
+    for (const idx of core.standIns) filled[idx] += 1
+    return { counts: filled, standIns: standIns.concat(core.standIns), meld, pair: core.pair }
+  }
+  return null
+}
+
+function assignOrphanCore(counts: number[], jokers: number): { standIns: number[]; pair: number } | null {
+  const missing: number[] = []
+  let pair = -1
+  for (const o of ORPHAN_INDEXES) {
+    const c = counts[o]
+    if (c === 0) missing.push(o)
+    else if (c === 1) {
+      /* covered */
+    } else if (c === 2) {
+      if (pair >= 0) return null
+      pair = o
+    } else return null
+  }
+  for (let i = 0; i < KIND_COUNT; i++) if (!ORPHAN_SET.has(i) && counts[i] > 0) return null
+  if (missing.length > jokers) return null
+  const left = jokers - missing.length
+  const standIns = missing.slice()
+  if (pair >= 0) return left === 0 ? { standIns, pair } : null
+  if (left !== 1) return null
+  const extra = ORPHAN_INDEXES.find((o) => counts[o] + (missing.includes(o) ? 1 : 0) === 1) ?? ORPHAN_INDEXES[0]
+  standIns.push(extra)
+  return { standIns, pair: extra }
+}
+
+export function resolveSixteenFill(counts: number[], jokers: number): { counts: number[]; standIns: number[]; pair: number; ranks: [number[], number[], number[]] } | null {
+  if (!isSixteenUnrelatedComplete(counts, jokers)) return null
+  for (const shape of sixteenShapes()) {
+    if (!fitsSixteen(counts, jokers, shape.kinds)) continue
+    const missing: number[] = []
+    let pair = -1
+    for (const k of shape.kinds) {
+      const c = counts[k]
+      if (c === 0) missing.push(k)
+      else if (c === 2) pair = k
+    }
+    const standIns = missing.slice()
+    if (pair < 0) {
+      pair = missing[0] ?? shape.kinds[0]
+      standIns.push(pair)
+    }
+    const filled = counts.slice()
+    for (const idx of standIns) filled[idx] += 1
+    return { counts: filled, standIns, pair, ranks: shape.ranks }
+  }
+  return null
+}

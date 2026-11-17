@@ -31,7 +31,19 @@ export function RulesSheet({ onClose, onChange }: { onClose: () => void; onChang
           <button className={rules.ladders?.concealed === 'stack' ? 'on' : ''} onClick={() => setRules({ ...rules, ladders: { ...rules.ladders, concealed: rules.ladders?.concealed === 'stack' ? 'highest' : 'stack' } })}>暗刻 stack</button>
           <button className={rules.ladders?.flush === 'stack' ? 'on' : ''} onClick={() => setRules({ ...rules, ladders: { ...rules.ladders, flush: rules.ladders?.flush === 'stack' ? 'highest' : 'stack' } })}>一色 stack</button>
           <button onClick={() => setRules({ name: 'House' })}>House</button>
+          <button onClick={() => { const blob = new Blob([JSON.stringify(rules, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${rules.name || 'rules'}.json`; a.click(); URL.revokeObjectURL(url) }}>Export</button>
+          <button onClick={() => { const hash = `r=${encodeURIComponent(JSON.stringify(rules))}`; navigator.clipboard?.writeText(`${location.origin}${location.pathname}#${hash}`) }}>Copy link</button>
+          <button onClick={() => window.print()}>Print</button>
         </div>
+        <input type="file" accept="application/json" aria-label="Import rules" onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (!file) return
+          file.text().then((text) => {
+            const parsed = JSON.parse(text) as RuleDiff
+            if (!parsed || typeof parsed !== 'object' || !parsed.name) throw new Error('Rule file needs a name')
+            setRules(parsed)
+          }).catch(() => setQuery('Import failed'))
+        }} />
         {shown.slice(0, 40).map((pattern) => (
           <label key={pattern.id} className="row" style={{ justifyContent: 'space-between' }}>
             <span>{pattern.zh} <span className="muted">{pattern.en}</span></span>

@@ -102,6 +102,21 @@ describe('ledger', () => {
     expect(replayLedger([...events.slice(0, -1), events[2]]).claims[0].value).toBe(37)
   })
 
+  it('pays 反雪 from each prior winner on the discarder\'s next win and does not cap the payment at 封頂', () => {
+    const state = replayLedger([
+      { type: 'setup', players, dealerId: 'a', settings: { ...quiet, limitInput: 999, counterSnowDouble: 5 } },
+      { type: 'multi', discarderId: 'a', winners: [{ id: 'b', farn: 4 }, { id: 'c', farn: 6 }] },
+      { type: 'draw' },
+      { type: 'win', winnerId: 'a', selfDraw: true, farn: 5000 },
+    ])
+    expect(state.pendingSnow).toBeNull()
+    expect(state.nets.a).toBeGreaterThan(5000)
+    expect(state.nets.b).toBeLessThan(0)
+    expect(state.nets.c).toBeLessThan(0)
+    expect(state.settings.limitInput).toBe(999)
+    expect(ledgerZeroSum(state)).toBe(0)
+  })
+
   it('settles with the fewest payments', () => {
     const payments = fewestPayments({ a: 30, b: -10, c: -20, d: 0 })
     expect(payments).toHaveLength(2)
