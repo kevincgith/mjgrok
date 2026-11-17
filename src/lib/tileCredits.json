@@ -1,0 +1,346 @@
+[
+  {
+    "id": "m1",
+    "file": "MJw1-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw1-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “1 Character” (一萬)."
+  },
+  {
+    "id": "t1",
+    "file": "MJt1-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt1-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “1 Dot” (一筒)."
+  },
+  {
+    "id": "b1",
+    "file": "MJs1-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs1-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “1 Stick” (一索)."
+  },
+  {
+    "id": "m2",
+    "file": "MJw2-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw2-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “2 Characters” (二萬)."
+  },
+  {
+    "id": "t2",
+    "file": "MJt2-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt2-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “2 Dots” (二筒)."
+  },
+  {
+    "id": "b2",
+    "file": "MJs2-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs2-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “2 Sticks” (二索)."
+  },
+  {
+    "id": "m3",
+    "file": "MJw3-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw3-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “3 Characters” (三萬)."
+  },
+  {
+    "id": "t3",
+    "file": "MJt3-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt3-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “3 Dots” (三筒)."
+  },
+  {
+    "id": "b3",
+    "file": "MJs3-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs3-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “3 Sticks” (三索)."
+  },
+  {
+    "id": "m4",
+    "file": "MJw4-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw4-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “4 Characters” (四萬)."
+  },
+  {
+    "id": "t4",
+    "file": "MJt4-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt4-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “4 Dots” (四筒)."
+  },
+  {
+    "id": "b4",
+    "file": "MJs4-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs4-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “4 Sticks” (四索)."
+  },
+  {
+    "id": "m5",
+    "file": "MJw5-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw5-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “5 Characters” (伍萬)."
+  },
+  {
+    "id": "t5",
+    "file": "MJt5-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt5-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “5 Dots” (五筒)."
+  },
+  {
+    "id": "b5",
+    "file": "MJs5-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs5-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “5 Sticks” (五索)."
+  },
+  {
+    "id": "m6",
+    "file": "MJw6-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw6-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “6 Characters” (六萬)."
+  },
+  {
+    "id": "t6",
+    "file": "MJt6-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt6-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “6 Dots” (六筒)."
+  },
+  {
+    "id": "b6",
+    "file": "MJs6-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs6-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “6 Sticks” (六索)."
+  },
+  {
+    "id": "m7",
+    "file": "MJw7-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw7-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “7 Characters” (七萬)."
+  },
+  {
+    "id": "t7",
+    "file": "MJt7-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt7-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “7 Dots” (七筒)."
+  },
+  {
+    "id": "b7",
+    "file": "MJs7-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs7-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “7 Sticks” (七索)."
+  },
+  {
+    "id": "m8",
+    "file": "MJw8-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw8-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “8 Characters” (八萬)."
+  },
+  {
+    "id": "t8",
+    "file": "MJt8-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt8-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “8 Dots” (八筒)."
+  },
+  {
+    "id": "b8",
+    "file": "MJs8-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs8-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “8 Sticks” (八索)."
+  },
+  {
+    "id": "m9",
+    "file": "MJw9-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJw9-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “9 Characters” (九萬)."
+  },
+  {
+    "id": "t9",
+    "file": "MJt9-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJt9-.svg",
+    "artist": "Cangjie6 (remake), Jerry Crimson Mann (original), User:Dewclouds (vectorisation)",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “9 Dots” (九筒)."
+  },
+  {
+    "id": "b9",
+    "file": "MJs9-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJs9-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “9 Sticks” (九索)."
+  },
+  {
+    "id": "z1",
+    "file": "MJf1-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJf1-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “East” (東)."
+  },
+  {
+    "id": "z2",
+    "file": "MJf2-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJf2-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “South” (南)."
+  },
+  {
+    "id": "z3",
+    "file": "MJf3-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJf3-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “West” (西)."
+  },
+  {
+    "id": "z4",
+    "file": "MJf4-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJf4-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “North” (北)."
+  },
+  {
+    "id": "z5",
+    "file": "MJd1-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJd1-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Red dragon” (中)."
+  },
+  {
+    "id": "z6",
+    "file": "MJd2-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJd2-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Green dragon” (發)."
+  },
+  {
+    "id": "z7",
+    "file": "MJd3-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJd3-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “White dragon” (白)."
+  },
+  {
+    "id": "season1",
+    "file": "MJh1-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJh1-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Spring” (春)."
+  },
+  {
+    "id": "flower1",
+    "file": "MJh5-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJh5-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Plum blossom” (梅)."
+  },
+  {
+    "id": "season2",
+    "file": "MJh2-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJh2-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Summer” (夏)."
+  },
+  {
+    "id": "flower2",
+    "file": "MJh6-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJh6-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Orchid” (蘭)."
+  },
+  {
+    "id": "season3",
+    "file": "MJh3-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJh3-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Autumn” (秋)."
+  },
+  {
+    "id": "flower3",
+    "file": "MJh7-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJh7-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Chrysanthemum” (菊)."
+  },
+  {
+    "id": "season4",
+    "file": "MJh4-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJh4-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Winter” (冬)."
+  },
+  {
+    "id": "flower4",
+    "file": "MJh8-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJh8-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Bamboo” (竹)."
+  },
+  {
+    "id": "joker",
+    "file": "MJj1-.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:MJj1-.svg",
+    "artist": "Cangjie6",
+    "license": "CC BY-SA 4.0",
+    "description": "The Mahjong tile “Joker” (百搭)."
+  }
+]
