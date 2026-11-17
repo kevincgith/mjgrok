@@ -104,7 +104,7 @@ export function LedgerPage() {
       {view === 'patterns' && <Patterns state={state} />}
       {view === 'history' && <History store={store} onPick={(cursor) => setStore({ ...store, cursor })} />}
       <Chart store={store} />
-      {state.players.length > 1 && (
+      {store.cursor > 0 && state.players.length > 1 && (
         <div className="card">
           <h2>對戰</h2>
           {state.players.map((player) => (

@@ -23,6 +23,8 @@ These tests check a number, a missing pattern, or a repeated instance. A row in 
 | `jokers.test.ts` sixteen | `147m147t147b1234567zj` scores 十六不搭 or 十六飛 |
 | `basics.test.ts` seeded brute force | 40 one-suit hands, seed 20261117: engine shanten 0/1/>1 matches an independent tenpai check and a one-exchange check |
 | `ledger.test.ts` 反雪 and 封頂 | multi-ron by A, a draw, then A self-draws 5000 with limitInput 999; A’s net is above 5000, B and C are negative, zero-sum holds |
+| `catalogExact.test.ts` | every catalog id: exact tai and count, listed exclusions absent, and a named hand where a paying pattern is absent |
+| `ledger.test.ts` substitution | after A’s self-draw of 10, substituting E leaves A at 30 and E at 0; swapping E and B does not move the nets |
 
 The table below is the catalog index. It is not, by itself, evidence that every pattern has a negative hand and a repeat-count check.
 
