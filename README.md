@@ -7,11 +7,12 @@ Hong Kong / Taiwan mahjong scoring, waits, and a small trainer. The rules engine
 ```bash
 npm install
 npm test
+npx tsc -b --pretty false --noEmit
 npm run build
 npm run dev
 ```
 
-`npm test` runs Vitest. `npm run build` typechecks and writes `dist/`. Asset URLs are relative, so the same build works at `/` and under `/mjgrok/`.
+`npm test` runs Vitest. `npm run build` typechecks and writes `dist/`. The Vite base is `/mjgrok/`, which is the GitHub Pages project path. Dev and preview are served at `http://127.0.0.1:<port>/mjgrok/`. Share links, the manifest, and the service worker use that same path.
 
 Regenerate tile faces from Wikimedia Commons (rate-limited; be polite):
 
