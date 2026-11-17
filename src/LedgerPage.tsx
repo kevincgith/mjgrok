@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { defaultLedgerSettings, fewestPayments, replayLedger, roundLabel, type LedgerEvent, type LedgerPlayer, type LedgerSettings } from '@mjwaits/shared'
+import { clampFarnInput, defaultLedgerSettings, fewestPayments, replayLedger, roundLabel, type LedgerEvent, type LedgerPlayer, type LedgerSettings } from '@mjwaits/shared'
 import { Icon } from './ui'
 
 const KEY = 'mjwaits.scores'
@@ -103,6 +103,7 @@ export function LedgerPage() {
       {view === 'stats' && <Stats state={state} />}
       {view === 'patterns' && <Patterns state={state} />}
       {view === 'history' && <History store={store} onPick={(cursor) => setStore({ ...store, cursor })} />}
+      <Extremes store={store} />
       <Chart store={store} />
       {store.cursor > 0 && state.players.length > 1 && (
         <div className="card">
@@ -120,7 +121,7 @@ export function LedgerPage() {
               <button className={selfDraw ? 'on' : ''} onClick={() => setSelfDraw(!selfDraw)}>自摸</button>
               {!selfDraw && state.players.filter((p) => p.id !== sheet).map((p) => <button key={p.id} className={discarder === p.id ? 'on' : ''} onClick={() => setDiscarder(p.id)}>{p.name}</button>)}
             </div>
-            <input value={farn} onChange={(e) => setFarn(e.target.value.replace(/[^\d]/g, ''))} aria-label="farn" style={{ fontSize: 22, width: '100%', margin: '0.5rem 0' }} />
+            <input value={farn} onChange={(e) => setFarn(clampFarnInput(e.target.value, state.settings.limitInput))} aria-label="farn" style={{ fontSize: 22, width: '100%', margin: '0.5rem 0' }} />
             <p>底 {state.settings.base} · 番 {farn} · 高分 {Number(farn) >= state.settings.highScore ? 'yes' : 'no'} · {multi === 'none' ? '' : multi}</p>
             {patterns.length > 0 && <p className="muted">{patterns.map((p) => `${p.nameZh} ${p.tai}`).join(' · ')}</p>}
             <button className="primary" onClick={() => { push({ type: 'win', winnerId: sheet, selfDraw, discarderId: selfDraw ? undefined : discarder, farn: Number(farn) || 0, multi, takeJackpot: state.pot > 0, patterns }); setPatterns([]); setSheet(null) }}>Record</button>
@@ -162,6 +163,23 @@ function Seat({ id, state, color, onClick }: { id?: string; state: ReturnType<ty
       <small>{state.lastDeltas[id] ? `last ${state.lastDeltas[id]}` : ''}</small>
       {claim && <small> 拉 {claim.value}</small>}
     </button>
+  )
+}
+
+function Extremes({ store }: { store: Store }) {
+  const wins = store.events.slice(0, store.cursor).flatMap((event) => {
+    if (event.type === 'win') return [event.farn]
+    if (event.type === 'multi') return event.winners.map((winner) => winner.farn)
+    return []
+  })
+  if (!wins.length) return null
+  const best = Math.max(...wins)
+  const worst = Math.min(...wins)
+  return (
+    <div className="card row">
+      <span><Icon name="best" size={18} /> Best {best}</span>
+      <span><Icon name="worst" size={18} /> Worst {worst}</span>
+    </div>
   )
 }
 
@@ -335,8 +353,8 @@ function Settings({ settings, onSave, onClose }: { settings: LedgerSettings; onS
     <div className="sheet-back" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <h2>設定</h2>
-        <label>封頂 input <input type="number" min={0} max={999} value={draft.limitInput} onChange={(e) => setDraft({ ...draft, limitInput: Math.max(0, Math.min(999, Number(e.target.value) || 0)) })} /></label>
-        <p className="muted">封頂 is an input only. It never caps a payment.</p>
+        <label>封頂 input <input type="number" min={0} value={draft.limitInput} onChange={(e) => setDraft({ ...draft, limitInput: Math.max(0, Number(e.target.value) || 0) })} /></label>
+        <p className="muted">封頂 caps the farn you can type. Default 999. It never caps a payment.</p>
         <label>底 <input type="number" value={draft.base} onChange={(e) => setDraft({ ...draft, base: Number(e.target.value) })} /></label>
         <label>莊 <input type="number" value={draft.dealerTai} onChange={(e) => setDraft({ ...draft, dealerTai: Number(e.target.value) })} /></label>
         <label>連莊 <input type="number" value={draft.streakTai} onChange={(e) => setDraft({ ...draft, streakTai: Number(e.target.value) })} /></label>

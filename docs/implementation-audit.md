@@ -2,7 +2,7 @@
 
 The numbers below are from the run that produced this file. Do not treat an older sentence in git history as the current result. This build is not claimed production-ready.
 
-`npx tsc -b --noEmit` passed. `npm test` passed 353 tests. `npm run build` succeeded.
+`npx tsc -b --noEmit` passed. `npm test` passed 362 tests. `npm run build` is recorded in the commit that follows this note if the build log says it succeeded.
 
 ## Complete
 
@@ -22,15 +22,21 @@ The numbers below are from the run that produced this file. Do not treat an olde
 ## Gaps
 
 - There is no second legacy scorer and there will not be one in this repository. The scoring document described a frozen copy of an older app. That app was not opened. `scoreHand` errors are shown as text on the Scoring page (`Scoring failed` or the thrown message). The page does not replace a thrown total with a blank success state.
-- Rules 設定 edits values, exclusion edges, the four shape flags, and the chicken block. It exports JSON, imports a file (a clashing name gets a “ 2”), copies a `#r=` link, draws a QR of that link with the `qrcode` package, and prints a reference grouped by family with a page break before each family after the first. The printout does not draw a tile picture beside each pattern. The QR was not scanned with a camera.
+- Rules 設定 edits values, exclusion edges, the four shape flags, and the chicken block. It exports JSON, imports a file (a clashing name gets a “ 2”), copies a `#r=` link, and prints each pattern with its example tiles from `PATTERN_EXAMPLES`. `qr.test.ts` decodes that QR with jsQR. A phone camera was not used.
 - Discard ranking runs in `src/workers/discard.worker.ts`. The Waits and Drills pages show the worker’s elapsed milliseconds. The first cold ranking of a 17-tile hand is still about a second of worker time. The UI stays clickable, but the ranking is not instant.
 - Endless deals a shuffled 136-tile wall. Undo and redo restore the wall and the saved stats. New wall asks before clearing an unfinished hand. Reset asks before wiping `mjwaits.endless`.
 - Drill waits store answered/correct/wrong/time in `mjwaits.drills` under a key for the level and the flush flag. Discard drills store tries, best picks, and regret for that level.
 - The dice page draws four walls of 18 two-high stacks, rotated a few degrees, and gold-marks the counted stacks on the wall `(total - 1) % 4` selects. The seat ceremony writes each player’s wind and rotates the ring so the previous bottom player stays at the bottom. The tile travel is a CSS transition.
 - Scoring’s Record button opens the ledger 食胡 sheet. The winner is the player whose stored wind matches 門風, or the seat that many places after the dealer. Farn is the total minus 莊 and minus 雙響/三響. The pattern rows are stored on the win and tallied per player.
-- Ledger substitution keeps the outgoing net on that identity and seats the new player at zero. A swap exchanges chairs only. Every bonus preset is an editable amount and can be paid to the selected player. A freeform bonus can be everyone-pays, pays-everyone, or from/to. Stats, pattern counts, history, and the zero-crossed running total are on the ledger. Best and worst hand thumbnails are not drawn.
+- Ledger substitution keeps the outgoing net on that identity and seats the new player at zero. A swap exchanges chairs only. Every bonus preset is an editable amount and can be paid to the selected player. A freeform bonus can be everyone-pays, pays-everyone, or from/to. Stats, pattern counts, history, and the zero-crossed running total are on the ledger. Best and worst show the recorded farn with the thumb icons. Hand-picture thumbnails are not drawn.
 - Online sharing, camera capture, Play mode, bots, and WebGL are omitted on purpose.
-- After the service worker had claimed `http://127.0.0.1:4174/` and cached the shell, stylesheet, script, and tile SVGs, a navigation with Chrome’s network emulation set offline still rendered the MJWaits heading. A reload with `ignoreCache: true` did not; that flag bypasses the worker. Serving `dist/` at `/mjgrok/` returns the HTML with `./assets/...` and the script, stylesheet, and `tiles/t5.svg` respond 200.
+- The picker hides once the concealed count plus three per declared meld reaches 16. Show tiles opens it again.
+- 封頂 is the farn-entry limit (`clampFarnInput`). The default is 999 and the setting can be edited. A recorded payment above that limit is still paid in full.
+- `ledgerFarn` subtracts 莊 and 雙響/三響 from the scored total because the ledger adds those from its own settings. 底 stays in the sent farn. `acceptance.test.ts` replays that handoff and checks the payer’s net.
+- A value of 0 does not pay and does not suppress. Turning 正圈風 and 大四連刻 above 0 makes those patterns pay on a hand that already has the shape. `qr.test.ts` decodes a rule QR with jsQR and the imported diff keeps its fingerprint.
+- Best and worst are the highest and lowest recorded farn, drawn with the thumb icons.
+- The seat tab has eight step buttons, Run/Pause, and `assignCeremony`, which keeps the bottom player at index 0 and sets the dealer to East. `ceremony.test.ts` covers the count, the tube-end parity, and the ledger write.
+- Camera capture, Play mode, bots, and optional live sharing are out of scope. They are not missing features of this build.
 
 ## Resolutions
 

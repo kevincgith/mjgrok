@@ -119,6 +119,14 @@ export const defaultLedgerSettings = (): LedgerSettings => ({
 
 const WIND = ['東', '南', '西', '北']
 
+/** Cap a typed farn at the editable 封頂. The stored number is only an input limit. */
+export function clampFarnInput(raw: string, limitInput: number): string {
+  const digits = raw.replace(/[^\d]/g, '')
+  if (!digits) return ''
+  const cap = Number.isFinite(limitInput) ? Math.max(0, Math.floor(limitInput)) : 0
+  return String(Math.min(Number(digits), cap))
+}
+
 export function roundLabel(wind: number, index: number): string {
   return `${WIND[(wind - 1) % 4]}風${WIND[index % 4]}局`
 }

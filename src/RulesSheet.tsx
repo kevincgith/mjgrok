@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { CATALOG, type RuleDiff } from '@mjwaits/shared'
+import { CATALOG, PATTERN_EXAMPLES, parseNotation, type RuleDiff } from '@mjwaits/shared'
+import { TileFace } from './ui'
 
 const KEY = 'mjwaits.taiRuleSets'
 
@@ -89,12 +90,28 @@ export function RulesSheet({ onClose, onChange }: { onClose: () => void; onChang
         {qr && <img src={qr} alt="Rule link QR" width={220} height={220} />}
         <article className="rules-print">
           <h1>{rules.name} reference</h1>
+          <p>Page one is the value list. The next page is how a score is chosen. Each family after that shows the example tiles, the value, and what the pattern replaces.</p>
+          <section>
+            <h2>How a score is chosen</h2>
+            <p>The total is the best decomposition. When eight pairs and an ordinary reading both exist, both are added. A bigger pattern drops the smaller ones it lists. Open and concealed versions are separate rows. A value of 0 turns that pattern off and stops it from suppressing anything. 封頂 limits the farn typed into the ledger. It does not limit the payment.</p>
+            <p>Changes in this set: {rules.values ? Object.entries(rules.values).map(([id, value]) => `${id} ${value}`).join(', ') : 'none'}.</p>
+          </section>
           {Array.from(new Set(CATALOG.map((p) => p.family))).map((family) => (
             <section key={family}>
               <h2>{family}</h2>
-              {CATALOG.filter((p) => p.family === family).map((p) => (
-                <p key={p.id}><b>{p.zh}</b> {p.en} · {String(rules.values?.[p.id] ?? p.value)} · replaces {(p.excludes ?? []).join(', ') || '—'}</p>
-              ))}
+              {CATALOG.filter((p) => p.family === family).map((p) => {
+                const example = PATTERN_EXAMPLES[p.id] ?? ''
+                let kinds: string[] = []
+                try { kinds = parseNotation(example).map((tile) => tile.suit === 'j' ? 'j' : `${tile.rank}${tile.suit}`) } catch { kinds = [] }
+                return (
+                  <div key={p.id} className="card">
+                    <p><b>{p.zh}</b> {p.en}</p>
+                    <p>{p.shapes.join(', ')} · value {String(rules.values?.[p.id] ?? p.value)} · replaces {p.excludes.join(', ') || 'nothing'}</p>
+                    <p className="muted">{example}</p>
+                    <div className="tiles">{kinds.slice(0, 17).map((kind, index) => <TileFace key={`${kind}${index}`} kind={kind} className="small" />)}</div>
+                  </div>
+                )
+              })}
             </section>
           ))}
         </article>

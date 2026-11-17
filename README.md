@@ -28,8 +28,11 @@ python3 scripts/fetch-tiles.py
 - Swap dice: Round is `((sum - 1) % 3) + 1` (always 1–3). Tiles is `floor(sum / 3)`. The screen shows both and their product.
 - Wall break: from the dealer, count players counterclockwise by the dice total (`(total - 1) % 4`). Count that many stacks clockwise along the chosen wall. `18 - total` stacks stay. A total of 12 breaks the left wall and leaves 6.
 - Ledger 拉: the first win records a claim equal to the plain payment (base + farn + dealer bonus + 雙響/三響). A repeat pays plain + half the claim, rounding 0.5 up, and the new claim is the old claim plus that worth. 踢 pays the same way, deletes the old claim, and the new claim starts at the plain amount only.
-- 封頂 is an input cap of 999. A payment larger than that is still paid in full. See `ledger.test.ts`.
-- Jokers are wildcards with a concrete stand-in. Eight pairs, thirteen orphans, and sixteen unrelated accept a joker in place of a missing tile. See `jokers.test.ts`.
+- 封頂 defaults to 999 and is the largest farn the ledger sheet will accept. Change the number in 設定 to change that input limit. A payment already recorded above the limit is still paid in full. See `clampFarnInput` in `acceptance.test.ts`.
+- Recording a scored hand sends `total − 莊 − 雙響/三響`. The ledger adds the dealer bonus from its own streak, and it adds 5 or 10 again when the win is marked 雙響 or 三響. 底 stays inside the sent farn. Leave the ledger base at 0 when the score already includes 底, or the base is paid twice. See `ledgerFarn` in `acceptance.test.ts`.
+- Jokers are wildcards with a concrete stand-in. Eight pairs, thirteen orphans, and sixteen unrelated accept one or more jokers in place of missing tiles. See `jokers.test.ts` and `acceptance.test.ts`.
+- A pattern whose house value is 0, including 正圈風 and the longer 連刻 tiers, is detected again when that value is set above 0. It does not suppress other patterns while it is 0.
+- There is no second scoring engine. The scoring document mentioned a frozen copy of an older app. That app is not in this repository and was not opened. If scoring throws, the page shows the error.
 
 ## Credits
 

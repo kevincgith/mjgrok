@@ -50,8 +50,8 @@ export function WaitsPage() {
           <button className={sort ? 'on' : ''} onClick={() => setSort(!sort)}>Sort</button>
         </div>
         <div className="tiles" style={{ marginTop: 8 }} onPointerDown={(e) => { if (e.target === e.currentTarget && tiles.length) { const t = window.setTimeout(() => sync([]), 500); (e.currentTarget as HTMLElement).dataset.timer = String(t) } }} onPointerUp={(e) => { const id = (e.currentTarget as HTMLElement).dataset.timer; if (id) window.clearTimeout(Number(id)) }}>
-          {(sort ? [...tiles].sort((a, b) => formatNotation([a]).localeCompare(formatNotation([b]))) : tiles).map((tile, i) => (
-            <TileFace key={`${tile.suit}${tile.rank}${i}`} kind={tile.suit === 'j' ? 'j' : `${tile.rank}${tile.suit}`} onClick={() => sync(tiles.filter((_, j) => j !== i))} />
+          {(sort ? tiles.map((tile, index) => ({ tile, index })).sort((a, b) => formatNotation([a.tile]).localeCompare(formatNotation([b.tile]))) : tiles.map((tile, index) => ({ tile, index }))).map(({ tile, index }) => (
+            <TileFace key={`${tile.suit}${tile.rank}${index}`} kind={tile.suit === 'j' ? 'j' : `${tile.rank}${tile.suit}`} onClick={() => sync(tiles.filter((_, j) => j !== index))} />
           ))}
         </div>
         <p className="muted">Tap a tile to remove it. Long-press the empty row to clear.</p>

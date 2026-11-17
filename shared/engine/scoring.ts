@@ -1144,3 +1144,16 @@ function settle(raw: Record<string, Hit>, rules: EffectiveRules, shape: HandShap
   const total = matches.reduce((s, m) => s + m.tai, 0)
   return { total, matches, decomposition, shape, rulesFingerprint: rules.fingerprint, limitedBySearch: limited }
 }
+
+/**
+ * Farn to send to the ledger. 莊 is removed because the ledger adds the dealer
+ * bonus from its own streak. 雙響/三響 are removed because a multi win tells the
+ * ledger to add 5 or 10 again. The payment itself is never capped by 封頂.
+ */
+export function ledgerFarn(result: ScoreResult): { farn: number; multi: 'none' | 'double' | 'triple' } {
+  const all = [...result.matches, ...(result.second?.matches ?? [])]
+  const dealerTai = all.find((m) => m.id === 'dealer')?.tai ?? 0
+  const multi = all.find((m) => m.id === 'triple-win') ? 'triple' as const : all.find((m) => m.id === 'double-win') ? 'double' as const : 'none'
+  const multiTai = all.find((m) => m.id === 'triple-win' || m.id === 'double-win')?.tai ?? 0
+  return { farn: Math.max(0, result.total - dealerTai - multiTai), multi }
+}

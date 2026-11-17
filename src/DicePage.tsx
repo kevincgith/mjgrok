@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { replayLedger, type LedgerEvent } from '@mjwaits/shared'
+import { assignCeremony, CEREMONY_STEPS, CEREMONY_TILES, countedSeat, replayLedger, windsFromEnd, type LedgerEvent } from '@mjwaits/shared'
 
 function rot(face: number) {
   const map: Record<number, string> = { 1: 'rotateX(0deg)', 2: 'rotateY(-90deg)', 3: 'rotateX(-90deg)', 4: 'rotateX(90deg)', 5: 'rotateY(90deg)', 6: 'rotateX(180deg)' }
@@ -88,18 +88,9 @@ function Swap() {
   )
 }
 
-const STEPS = [
-  'Provisional East throws 3 dice',
-  'Total count picks the real East seat',
-  'Real East throws',
-  'Flip all 6 tiles',
-  'Earlier 筒 moves left, the other end moves right',
-  'Second total from real East picks the first player',
-  'Read winds from the 二筒 end if the total is even, otherwise the 一筒 end',
-  'Move to the assigned seats, East at the bottom',
-]
-
-const TILES = ['東', '南', '西', '北', '一筒', '二筒']
+const STEPS = CEREMONY_STEPS
+const TILES = CEREMONY_TILES
+const SEAT_POS: Record<string, [number, number]> = { '東': [50, 78], '南': [82, 50], '西': [50, 16], '北': [18, 50] }
 
 function Seats() {
   const [step, setStep] = useState(0)
@@ -112,16 +103,10 @@ function Seats() {
   const [secondThrow, setSecondThrow] = useState(7)
   const [order, setOrder] = useState<number[]>([0, 1, 2, 3, 4, 5])
   const [message, setMessage] = useState('')
-  const realEast = (provisional + firstThrow - 1) % 4
-  const reader = (realEast + secondThrow - 1) % 4
+  const realEast = countedSeat(provisional, firstThrow)
+  const reader = countedSeat(realEast, secondThrow)
   const fromTwo = secondThrow % 2 === 0
-  const windStart = fromTwo ? order.indexOf(5) : order.indexOf(4)
-  const winds: string[] = []
-  for (let n = 1; n <= 6 && winds.length < 4; n++) {
-    const label = TILES[order[(windStart + n) % 6]]
-    if (label === '一筒' || label === '二筒') continue
-    winds.push(label)
-  }
+  const winds = windsFromEnd(order, secondThrow)
   useEffect(() => {
     if (!running) return
     const delay = step === 0 || step === 2 ? 1400 : 1000
@@ -150,17 +135,10 @@ function Seats() {
     const state = replayLedger(events)
     if (!state.players.length || !state.seatOrder.length) { setMessage('Start a ledger game before applying seats.'); return }
     const bottom = state.seatOrder[0]
-    const windValue: Record<string, 1 | 2 | 3 | 4> = { '東': 1, '南': 2, '西': 3, '北': 4 }
-    const assigned: Record<string, 1 | 2 | 3 | 4> = {}
-    winds.forEach((label, n) => {
-      const seat = ids[(reader + n) % 4]
-      const value = windValue[label]
-      if (seat && value) assigned[seat] = value
-    })
-    const ring = [1, 2, 3, 4].map((value) => Object.entries(assigned).find(([, wind]) => wind === value)?.[0]).filter((id): id is string => !!id)
-    const at = ring.indexOf(bottom)
-    const order = ring.length === 4 && at >= 0 ? [...ring.slice(at), ...ring.slice(0, at)] : state.seatOrder.slice()
-    const eastPlayer = Object.entries(assigned).find(([, wind]) => wind === 1)?.[0] ?? ids[realEast] ?? bottom
+    const placed = assignCeremony(ids, reader, winds, bottom)
+    const order = placed.order
+    const assigned = placed.winds
+    const eastPlayer = placed.eastId
     const next = [...events, { type: 'seats' as const, order, winds: assigned }, { type: 'dealer' as const, dealerId: eastPlayer, streak: 0 }]
     localStorage.setItem('mjwaits.scores', JSON.stringify({ events: next, cursor: next.length }))
     const eastName = state.roster.find((p) => p.id === eastPlayer)?.name ?? eastPlayer
@@ -181,10 +159,11 @@ function Seats() {
           const placed = step >= 3
           const split = step >= 4
           const seated = step >= 7
-          const x = seated && i < 4 ? [50, 82, 50, 18][i] : split ? (slot < 3 ? 18 + slot * 14 : 58 + (slot - 3) * 14) : 12 + slot * 13
-          const y = seated && i < 4 ? [78, 50, 16, 50][i] : seated ? 46 : 46
+          const windPos = seated ? SEAT_POS[label] : undefined
+          const x = windPos ? windPos[0] : split ? (slot < 3 ? 18 + slot * 14 : 58 + (slot - 3) * 14) : 12 + slot * 13
+          const y = windPos ? windPos[1] : 46
           return (
-            <div key={label} style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)', transition: 'left 0.8s ease, top 0.8s ease', width: 52, height: 72, borderRadius: 6, background: placed ? 'var(--tile)' : 'var(--tile-back)', borderBottom: '5px solid var(--tile-edge)', display: 'grid', placeItems: 'center', color: 'var(--ink)', fontWeight: 600 }}>
+            <div key={label} style={{ position: 'absolute', left: `${x}%`, top: `${y}%`, transform: 'translate(-50%, -50%)', transition: 'left 0.8s ease, top 0.8s ease', width: seated ? 64 : 52, height: seated ? 88 : 72, borderRadius: 6, background: placed ? '#fff' : 'var(--tile-back)', borderBottom: '5px solid var(--tile-edge)', display: 'grid', placeItems: 'center', color: 'var(--text)', fontWeight: 700, fontSize: seated ? 22 : 16 }}>
               {placed ? label : ''}
             </div>
           )
@@ -192,6 +171,9 @@ function Seats() {
       </div>
       <p><b>{STEPS[step]}</b></p>
       <p className="muted">Step {step + 1} / 8. First total {firstThrow} from {names[provisional]} lands on {names[realEast]}. Second total {secondThrow} reads from {fromTwo ? '二筒' : '一筒'} toward {names[reader]}.</p>
+      <div className="row">
+        {STEPS.map((caption, index) => <button key={caption} className={step === index ? 'on' : ''} onClick={() => { setRunning(false); setStep(index) }}>{index + 1}</button>)}
+      </div>
       <div className="row">
         <button className={running ? 'on' : ''} onClick={() => { if (step >= 7) setStep(0); setRunning(!running) }}>{running ? 'Pause' : 'Run'}</button>
         <button onClick={() => { setRunning(false); setStep((value) => Math.min(7, value + 1)) }}>Next</button>

@@ -1,10 +1,12 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   defaultSituation,
   formatHand,
   kindOf,
   kongCount,
   parseHand,
+  compile,
+  ledgerFarn,
   replayLedger,
   scoreHand,
   type PatternUse,
@@ -17,7 +19,7 @@ import type { RuleDiff } from '@mjwaits/shared'
 
 type Mode = 'hand' | 'chow' | 'pung' | 'open-kong' | 'closed-kong'
 interface Meld { type: Mode; tiles: string[] }
-interface Recent { id: string; notation: string; query: string }
+interface Recent { id: string; notation: string; query: string; fingerprint?: string }
 
 const SUITS = [
   ['m', '萬'],
@@ -55,9 +57,12 @@ export function ScoringPage() {
   const [showRecent, setShowRecent] = useState(false)
   const [showRules, setShowRules] = useState(false)
   const [rules, setRules] = useState<RuleDiff>(loadRules)
+  const [pickerHeld, setPickerHeld] = useState(false)
+  const wasComplete = useRef(false)
 
   useEffect(() => { localStorage.setItem('mjwaits.picker', JSON.stringify(layout)) }, [layout])
   useEffect(() => { localStorage.setItem('mjwaits.recentScoring', JSON.stringify(recent)) }, [recent])
+  const fingerprint = compile(rules).fingerprint
   useEffect(() => {
     const hash = location.hash.replace(/^#/, '')
     const params = new URLSearchParams(hash)
@@ -86,6 +91,16 @@ export function ScoringPage() {
     flowers: flowers.map(toTile),
     winningTile: winning ? toTile(winning) : null,
   }), [concealed, declared, flowers, winning])
+  useEffect(() => {
+    const notation = formatHand(hand)
+    if (!notation) return
+    const query = situationQuery(live)
+    setRecent((prev) => {
+      const hit = prev.find((item) => item.notation === notation)
+      if (!hit || (hit.query === query && hit.fingerprint === fingerprint)) return prev
+      return prev.map((item) => item.notation === notation ? { ...item, query, fingerprint } : item)
+    })
+  }, [hand, live, fingerprint])
   const scored = useMemo(() => {
     try {
       return { result: scoreHand(hand, live, rules.name === 'House' && !rules.values ? undefined : rules)[0], error: '' }
@@ -121,7 +136,7 @@ export function ScoringPage() {
     const query = situationQuery(live)
     const hash = `t=${encodeURIComponent(formatHand(hand))}${query ? `&s=${query}` : ''}`
     const url = `${location.origin}${location.pathname}#${hash}`
-    const entry: Recent = { id: hash, notation: formatHand(hand), query }
+    const entry: Recent = { id: hash, notation: formatHand(hand), query, fingerprint }
     setRecent([entry, ...recent.filter((r) => r.notation !== entry.notation)].slice(0, 10))
     navigator.clipboard?.writeText(url).then(() => setToast('Link copied')).catch(() => setToast(url))
     if (navigator.share) navigator.share({ title: 'MJWaits', url }).catch(() => {})
@@ -132,9 +147,8 @@ export function ScoringPage() {
     try { store = JSON.parse(localStorage.getItem('mjwaits.scores') || '') } catch { store = { events: [], cursor: 0 } }
     const played = replayLedger((store.events ?? []).slice(0, store.cursor ?? 0) as never)
     if (!played.players.length || !(store.cursor > 0)) { setToast('Start a ledger game before recording a hand.'); return }
-    const dealerTai = result.matches.find((m) => m.id === 'dealer')?.tai ?? 0
-    const multiTai = [...result.matches, ...(result.second?.matches ?? [])].find((m) => m.id === 'double-win' || m.id === 'triple-win')?.tai ?? 0
-    const farn = Math.max(0, result.total - dealerTai - multiTai)
+    const sent = ledgerFarn(result)
+    const farn = sent.farn
     const wind = live.seatWind
     const at = played.seatOrder.indexOf(played.dealerId)
     const byWind = Object.entries(played.winds).find(([, value]) => value === wind)?.[0]
@@ -146,7 +160,7 @@ export function ScoringPage() {
       winnerId,
       selfDraw: live.selfDraw,
       farn,
-      multi: live.multiWin === 'triple' ? 'triple' : live.multiWin === 'double' ? 'double' : 'none',
+      multi: sent.multi,
       patterns,
     }))
     location.hash = 'ledger'
@@ -155,7 +169,13 @@ export function ScoringPage() {
     setSit(clampSituation(cycleSituation(live, key, caps), caps))
   }
 
-  const complete = concealed.length + declared.length * 3 >= 14
+  const tileCount = concealed.length + declared.length * 3
+  const complete = tileCount >= 16
+  const showPicker = !complete || pickerHeld
+  useEffect(() => {
+    if (complete && !wasComplete.current) setPickerHeld(false)
+    wasComplete.current = complete
+  }, [complete])
   return (
     <section>
       <div className="sticky">
@@ -186,7 +206,8 @@ export function ScoringPage() {
             ))}
           </div>
         )}
-        <div className="picker-groups">
+        {complete && <button onClick={() => setPickerHeld(!pickerHeld)}>{showPicker ? 'Hide tiles' : 'Show tiles'}</button>}
+        {showPicker && <div className="picker-groups">
           {(layout === 'classic' || group === '花') && (
             <div className="suit-row eight">
               {FLOWERS.map((name, i) => <Picker key={name} kind={`${i + 1}f`} label={name} dead={flowers.includes(`${i + 1}f`)} onAdd={addKind} />)}
@@ -204,7 +225,7 @@ export function ScoringPage() {
               {Array.from({ length: 9 }, (_, n) => <Picker key={`${suit}${n}`} kind={`${n + 1}${suit}`} label={`${n + 1}${label}`} dead={countKind(`${n + 1}${suit}`) >= 4} onAdd={addKind} />)}
             </div>
           ))}
-        </div>
+        </div>}
         {pending.length > 0 && <p className="muted">Building meld: {pending.join(' ')}</p>}
       </div>
       <div className="card">
@@ -282,7 +303,7 @@ export function ScoringPage() {
               setWinning(next.winningTile ? kindOf(next.winningTile) : null)
               setSit({ ...defaultSituation(), ...parseSituationQuery(item.query) })
               setShowRecent(false)
-            }}>{item.notation}</button>)}
+            }}>{item.notation}{item.fingerprint && item.fingerprint !== fingerprint ? ' · other rules' : ''}</button>)}
             <button className={armed ? 'danger-arm' : ''} onClick={() => { if (!armed) { setArmed(true); return } setRecent([]); setArmed(false) }}>Clear</button>
           </div>
         </div>
