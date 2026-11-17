@@ -5,7 +5,9 @@ import {
   kindOf,
   kongCount,
   parseHand,
+  replayLedger,
   scoreHand,
+  type PatternUse,
   type Situation,
 } from '@mjwaits/shared'
 import { bumpDealer, clampSituation, cycleSituation, parseSituationQuery, situationQuery, type SitKey } from './lib/situation'
@@ -124,6 +126,31 @@ export function ScoringPage() {
     navigator.clipboard?.writeText(url).then(() => setToast('Link copied')).catch(() => setToast(url))
     if (navigator.share) navigator.share({ title: 'MJWaits', url }).catch(() => {})
   }
+  function record() {
+    if (!result) { setToast(scored.error || 'Score a complete hand before recording it.'); return }
+    let store: { events: { type: string }[]; cursor: number }
+    try { store = JSON.parse(localStorage.getItem('mjwaits.scores') || '') } catch { store = { events: [], cursor: 0 } }
+    const played = replayLedger((store.events ?? []).slice(0, store.cursor ?? 0) as never)
+    if (!played.players.length || !(store.cursor > 0)) { setToast('Start a ledger game before recording a hand.'); return }
+    const dealerTai = result.matches.find((m) => m.id === 'dealer')?.tai ?? 0
+    const multiTai = [...result.matches, ...(result.second?.matches ?? [])].find((m) => m.id === 'double-win' || m.id === 'triple-win')?.tai ?? 0
+    const farn = Math.max(0, result.total - dealerTai - multiTai)
+    const wind = live.seatWind
+    const at = played.seatOrder.indexOf(played.dealerId)
+    const byWind = Object.entries(played.winds).find(([, value]) => value === wind)?.[0]
+    const winnerId = byWind && played.seatOrder.includes(byWind)
+      ? byWind
+      : played.seatOrder[(at + wind - 1 + played.seatOrder.length) % played.seatOrder.length]
+    const patterns: PatternUse[] = [...result.matches, ...(result.second?.matches ?? [])].map((m) => ({ id: m.id, nameZh: m.nameZh, tai: m.tai, count: m.count }))
+    sessionStorage.setItem('mjwaits.pendingWin', JSON.stringify({
+      winnerId,
+      selfDraw: live.selfDraw,
+      farn,
+      multi: live.multiWin === 'triple' ? 'triple' : live.multiWin === 'double' ? 'double' : 'none',
+      patterns,
+    }))
+    location.hash = 'ledger'
+  }
   function press(key: SitKey) {
     setSit(clampSituation(cycleSituation(live, key, caps), caps))
   }
@@ -138,6 +165,7 @@ export function ScoringPage() {
         <strong className="score">{result ? `${result.total} 番` : scored.error ? 'Error' : '—'}</strong>
         <button onClick={() => setShowRules(true)}><Icon name="settings" size={18} /> 設定</button>
         <button onClick={share}><Icon name="share" size={18} /> Share</button>
+        <button className="primary" style={{ width: 'auto' }} onClick={record}>Record</button>
       </div>
       <div className="card">
         <div className="row">

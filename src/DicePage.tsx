@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { replayLedger, type LedgerEvent } from '@mjwaits/shared'
 
 function rot(face: number) {
@@ -53,11 +53,18 @@ export function DicePage() {
 }
 
 function Wall({ total }: { total: number }) {
-  const stacks = useMemo(() => Array.from({ length: 18 }, (_, i) => i), [])
+  const broken = (total - 1) % 4
+  const places = ['dealer', 'right', 'across', 'left']
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(18, 1fr)', gap: 2, marginTop: 8 }}>
-      {stacks.map((i) => (
-        <div key={i} style={{ height: 28, background: i < total ? 'var(--gold)' : 'var(--tile-back)', borderBottom: '4px solid var(--tile-edge)', borderRadius: 2 }} />
+    <div className="walls" aria-label="Four walls">
+      {places.map((place, wall) => (
+        <div key={place} className={`wall wall-${place}`}>
+          {Array.from({ length: 18 }, (_, stack) => (
+            <span key={stack} className={`stack${wall === broken && stack < total ? ' counted' : ''}${wall === broken && stack === total ? ' gap' : ''}`}>
+              <i /><i />
+            </span>
+          ))}
+        </div>
       ))}
     </div>
   )
@@ -98,6 +105,7 @@ function Seats() {
   const [step, setStep] = useState(0)
   const [running, setRunning] = useState(false)
   const [names, setNames] = useState(['A', 'B', 'C', 'D'])
+  const [ids, setIds] = useState(['a', 'b', 'c', 'd'])
   const [editing, setEditing] = useState<number | null>(null)
   const [provisional, setProvisional] = useState(0)
   const [firstThrow, setFirstThrow] = useState(9)
@@ -121,6 +129,18 @@ function Seats() {
     return () => window.clearTimeout(timer)
   }, [running, step])
   useEffect(() => { if (step >= 7) setRunning(false) }, [step])
+  useEffect(() => {
+    const raw = localStorage.getItem('mjwaits.scores')
+    if (!raw) return
+    try {
+      const store = JSON.parse(raw) as { events: LedgerEvent[]; cursor: number }
+      const state = replayLedger(store.events.slice(0, store.cursor))
+      if (state.seatOrder.length >= 4) {
+        setIds(state.seatOrder.slice(0, 4))
+        setNames(state.seatOrder.slice(0, 4).map((id) => state.roster.find((p) => p.id === id)?.name ?? id))
+      }
+    } catch { /* the ceremony still runs with the placeholder names */ }
+  }, [])
   function apply() {
     const raw = localStorage.getItem('mjwaits.scores')
     if (!raw) { setMessage('Start a ledger game before applying seats.'); return }
@@ -130,13 +150,22 @@ function Seats() {
     const state = replayLedger(events)
     if (!state.players.length || !state.seatOrder.length) { setMessage('Start a ledger game before applying seats.'); return }
     const bottom = state.seatOrder[0]
-    const eastPlayer = state.seatOrder[realEast] ?? bottom
-    const rotated = state.seatOrder.slice()
-    const at = rotated.indexOf(bottom)
-    const kept = at <= 0 ? rotated : [...rotated.slice(at), ...rotated.slice(0, at)]
-    const next = [...events, { type: 'seats' as const, order: kept }, { type: 'dealer' as const, dealerId: eastPlayer, streak: 0 }]
+    const windValue: Record<string, 1 | 2 | 3 | 4> = { '東': 1, '南': 2, '西': 3, '北': 4 }
+    const assigned: Record<string, 1 | 2 | 3 | 4> = {}
+    winds.forEach((label, n) => {
+      const seat = ids[(reader + n) % 4]
+      const value = windValue[label]
+      if (seat && value) assigned[seat] = value
+    })
+    const ring = [1, 2, 3, 4].map((value) => Object.entries(assigned).find(([, wind]) => wind === value)?.[0]).filter((id): id is string => !!id)
+    const at = ring.indexOf(bottom)
+    const order = ring.length === 4 && at >= 0 ? [...ring.slice(at), ...ring.slice(0, at)] : state.seatOrder.slice()
+    const eastPlayer = Object.entries(assigned).find(([, wind]) => wind === 1)?.[0] ?? ids[realEast] ?? bottom
+    const next = [...events, { type: 'seats' as const, order, winds: assigned }, { type: 'dealer' as const, dealerId: eastPlayer, streak: 0 }]
     localStorage.setItem('mjwaits.scores', JSON.stringify({ events: next, cursor: next.length }))
-    setMessage(`Dealer is ${state.players.find((p) => p.id === eastPlayer)?.name ?? eastPlayer}. ${state.players.find((p) => p.id === bottom)?.name ?? 'Bottom'} stays at the bottom and neighbors stay in order.`)
+    const eastName = state.roster.find((p) => p.id === eastPlayer)?.name ?? eastPlayer
+    const bottomName = state.roster.find((p) => p.id === bottom)?.name ?? bottom
+    setMessage(`East is ${eastName}. ${bottomName} stays at the bottom. Winds ${order.map((id) => `${state.roster.find((p) => p.id === id)?.name ?? id}${['', '東', '南', '西', '北'][assigned[id] ?? 0] ?? ''}`).join(' ')}.`)
   }
   return (
     <div className="card">

@@ -4,7 +4,18 @@ import { TileFace } from './ui'
 import { useDiscards } from './lib/useDiscards'
 
 type Stats = { answered: number; correct: number; wrong: number; ms: number }
+type DiscardStats = { answered: number; best: number; regret: number }
+interface DrillStore { waits: Record<string, Stats>; discards: Record<string, DiscardStats> }
+const DRILL_KEY = 'mjwaits.drills'
 const empty = (): Stats => ({ answered: 0, correct: 0, wrong: 0, ms: 0 })
+const emptyDiscard = (): DiscardStats => ({ answered: 0, best: 0, regret: 0 })
+function loadDrills(): DrillStore {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DRILL_KEY) || '') as DrillStore
+    return { waits: parsed.waits ?? {}, discards: parsed.discards ?? {} }
+  } catch { return { waits: {}, discards: {} } }
+}
+function waitKey(level: number, flush: boolean) { return `${level}-${flush ? 'flush' : 'suit'}` }
 
 function rng(seed: number) {
   let s = seed || 1
@@ -27,7 +38,8 @@ export function DrillsPage() {
   const [tab, setTab] = useState<'waits' | 'discards' | 'endless'>('waits')
   const [level, setLevel] = useState(1)
   const [flush, setFlush] = useState(false)
-  const [stats, setStats] = useState<Stats>(empty())
+  const [book, setBook] = useState<DrillStore>(loadDrills)
+  const stats = book.waits[waitKey(level, flush)] ?? empty()
   const [puzzle, setPuzzle] = useState(() => deal(1, false))
   const [started, setStarted] = useState(Date.now())
   const [picked, setPicked] = useState<string[]>([])
@@ -37,9 +49,11 @@ export function DrillsPage() {
     const wrong = picked.filter((k) => !answer.includes(k)).length
     const missed = answer.filter((k) => !picked.includes(k)).length
     const ok = wrong === 0 && missed === 0
-    setStats({ ...stats, answered: stats.answered + 1, correct: stats.correct + (ok ? 1 : 0), wrong: stats.wrong + (ok ? 0 : 1), ms: stats.ms + (Date.now() - started) })
+    const key = waitKey(level, flush)
+    setBook({ ...book, waits: { ...book.waits, [key]: { answered: stats.answered + 1, correct: stats.correct + (ok ? 1 : 0), wrong: stats.wrong + (ok ? 0 : 1), ms: stats.ms + (Date.now() - started) } } })
     setShown(true)
   }
+  useEffect(() => { localStorage.setItem(DRILL_KEY, JSON.stringify(book)) }, [book])
   return (
     <section>
       <div className="seg">
@@ -51,7 +65,7 @@ export function DrillsPage() {
         <div className="row">
           {[1, 2, 3, 4, 5].map((n) => <button key={n} className={level === n ? 'on' : ''} onClick={() => { setLevel(n); setPuzzle(deal(n, flush)); setShown(false); setPicked([]) }}>L{n}</button>)}
           <button className={flush ? 'on' : ''} onClick={() => setFlush(!flush)}>Flush</button>
-          <button onClick={() => { setStats(empty()); setPuzzle(deal(level, flush)); setShown(false) }}>Reset</button>
+          <button onClick={() => { if (!window.confirm('Clear saved drill stats for every level?')) return; setBook({ waits: {}, discards: {} }); setPuzzle(deal(level, flush)); setShown(false) }}>Reset</button>
         </div>
         <p className="muted">{stats.answered} answered, {stats.correct} correct, {stats.wrong} wrong, {stats.answered ? Math.round(stats.correct / stats.answered * 100) : 0}%, avg {stats.answered ? Math.round(stats.ms / stats.answered / 100) / 10 : 0}s</p>
         {tab === 'waits' && (
@@ -72,14 +86,14 @@ export function DrillsPage() {
             )}
           </>
         )}
-        {tab === 'discards' && <DiscardDrill level={level} />}
+        {tab === 'discards' && <DiscardDrill level={level} book={book} onBook={setBook} />}
         {tab === 'endless' && <Endless />}
       </div>
     </section>
   )
 }
 
-function DiscardDrill({ level }: { level: number }) {
+function DiscardDrill({ level, book, onBook }: { level: number; book: DrillStore; onBook: (next: DrillStore) => void }) {
   const puzzle = useMemo(() => {
     const dealt = deal(level, false)
     dealt.tiles.push({ suit: 'm', rank: 9 })
@@ -88,11 +102,19 @@ function DiscardDrill({ level }: { level: number }) {
   const hand = useMemo(() => ({ concealed: puzzle.tiles, declared: [], flowers: [] }), [puzzle])
   const ranked = useDiscards(hand, true, level)
   const [choice, setChoice] = useState('')
+  const saved = book.discards[String(level)] ?? emptyDiscard()
   const best = ranked.rows[0]?.winPercent ?? 0
+  function choose(kind: string) {
+    setChoice(kind)
+    const row = ranked.rows.find((item) => item.discard === kind)
+    if (!row || ranked.pending) return
+    const regret = Math.max(0, best - row.winPercent)
+    onBook({ ...book, discards: { ...book.discards, [String(level)]: { answered: saved.answered + 1, best: saved.best + (regret === 0 ? 1 : 0), regret: saved.regret + regret } } })
+  }
   return (
     <>
-      <div className="tiles">{puzzle.tiles.map((t, i) => <TileFace key={i} kind={`${t.rank}${t.suit}`} onClick={() => setChoice(`${t.rank}${t.suit}`)} />)}</div>
-      <p className="muted">{ranked.pending ? 'Ranking in a worker…' : ranked.elapsedMs ? `Worker ${ranked.elapsedMs} ms` : ''}</p>
+      <div className="tiles">{puzzle.tiles.map((t, i) => <TileFace key={i} kind={`${t.rank}${t.suit}`} onClick={() => choose(`${t.rank}${t.suit}`)} />)}</div>
+      <p className="muted">Saved L{level}: {saved.answered} tries, {saved.best} best, regret {saved.answered ? Math.round(saved.regret / saved.answered) : 0}. {ranked.pending ? 'Ranking in a worker…' : ranked.elapsedMs ? `Worker ${ranked.elapsedMs} ms` : ''}</p>
       {ranked.error && <p className="bad">{ranked.error}</p>}
       {choice && <p>Choice {choice}. Best win {best}%. {ranked.rows.find((r) => r.discard === choice)?.winPercent === best ? 'Best' : 'Regret'}</p>}
       {ranked.rows.map((r) => <p key={r.discard}>{r.discard} win {r.winPercent}%</p>)}
@@ -151,11 +173,12 @@ function Endless() {
     setWall(wall.slice(16))
   }, [])
   function snapshot() {
-    return JSON.stringify({ wall, hand, pile, turn, loose, regret, tenpaiTurn, winTurn })
+    return JSON.stringify({ wall, hand, pile, turn, loose, regret, tenpaiTurn, winTurn, stats })
   }
   function restore(raw: string) {
-    const snap = JSON.parse(raw) as { wall: Tile[]; hand: Tile[]; pile: Tile[]; turn: number; loose: number; regret: number; tenpaiTurn: number | null; winTurn: number | null }
+    const snap = JSON.parse(raw) as { wall: Tile[]; hand: Tile[]; pile: Tile[]; turn: number; loose: number; regret: number; tenpaiTurn: number | null; winTurn: number | null; stats?: EndlessStats }
     setWall(snap.wall); setHand(snap.hand); setPile(snap.pile); setTurn(snap.turn); setLoose(snap.loose); setRegret(snap.regret); setTenpaiTurn(snap.tenpaiTurn); setWinTurn(snap.winTurn)
+    if (snap.stats) setStats(snap.stats)
   }
   function undo() {
     const prev = history[history.length - 1]
@@ -236,6 +259,7 @@ function Endless() {
         <button onClick={undo}>Undo</button>
         <button onClick={redo}>Redo</button>
         <button onClick={fresh}>New wall</button>
+        <button onClick={() => { if (!window.confirm('Reset Endless stats and deal a new wall?')) return; localStorage.removeItem(ENDLESS_KEY); setStats({ hands: 0, won: 0, loose: 0, regretSum: 0, turns: 0, tenpaiTurns: 0, winTurns: 0 }); const next = fullWall(); setWall(next.slice(16)); setHand(next.slice(0, 16)); setPile([]); setTurn(0); setLoose(0); setRegret(0); setTenpaiTurn(null); setWinTurn(null); setHistory([]); setFuture([]) }}>Reset</button>
       </div>
       {note && <p>{note}</p>}
       <p className="muted">Tap a tile to discard. Cmd/Ctrl-Z undoes. The worker ranks the hand before the tap is graded.</p>

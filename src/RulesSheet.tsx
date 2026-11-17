@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import QRCode from 'qrcode'
 import { CATALOG, type RuleDiff } from '@mjwaits/shared'
 
 const KEY = 'mjwaits.taiRuleSets'
@@ -17,6 +18,9 @@ export function loadRules(): RuleDiff {
 export function RulesSheet({ onClose, onChange }: { onClose: () => void; onChange: (rules: RuleDiff) => void }) {
   const [rules, setRules] = useState<RuleDiff>(loadRules)
   const [query, setQuery] = useState('')
+  const [openId, setOpenId] = useState<string | null>(null)
+  const [edge, setEdge] = useState('base')
+  const [qr, setQr] = useState('')
   useEffect(() => { localStorage.setItem(KEY, JSON.stringify(rules)); onChange(rules) }, [rules, onChange])
   const shown = CATALOG.filter((p) => `${p.zh}${p.en}${p.aliases.join('')}`.toLowerCase().includes(query.toLowerCase()))
   return (
@@ -32,7 +36,7 @@ export function RulesSheet({ onClose, onChange }: { onClose: () => void; onChang
           <button className={rules.ladders?.flush === 'stack' ? 'on' : ''} onClick={() => setRules({ ...rules, ladders: { ...rules.ladders, flush: rules.ladders?.flush === 'stack' ? 'highest' : 'stack' } })}>一色 stack</button>
           <button onClick={() => setRules({ name: 'House' })}>House</button>
           <button onClick={() => { const blob = new Blob([JSON.stringify(rules, null, 2)], { type: 'application/json' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = `${rules.name || 'rules'}.json`; a.click(); URL.revokeObjectURL(url) }}>Export</button>
-          <button onClick={() => { const hash = `r=${encodeURIComponent(JSON.stringify(rules))}`; navigator.clipboard?.writeText(`${location.origin}${location.pathname}#${hash}`) }}>Copy link</button>
+          <button onClick={() => { const hash = `r=${encodeURIComponent(JSON.stringify(rules))}`; const url = `${location.origin}${location.pathname}#${hash}`; navigator.clipboard?.writeText(url); QRCode.toDataURL(url, { margin: 1, width: 220 }).then(setQr).catch(() => setQr('')) }}>Copy link + QR</button>
           <button onClick={() => window.print()}>Print</button>
         </div>
         <input type="file" accept="application/json" aria-label="Import rules" onChange={(e) => {
@@ -41,15 +45,59 @@ export function RulesSheet({ onClose, onChange }: { onClose: () => void; onChang
           file.text().then((text) => {
             const parsed = JSON.parse(text) as RuleDiff
             if (!parsed || typeof parsed !== 'object' || !parsed.name) throw new Error('Rule file needs a name')
+            const current = loadRules()
+            if (current.name === parsed.name && JSON.stringify(current) !== JSON.stringify(parsed)) parsed.name = `${parsed.name} 2`
             setRules(parsed)
           }).catch(() => setQuery('Import failed'))
         }} />
-        {shown.slice(0, 40).map((pattern) => (
-          <label key={pattern.id} className="row" style={{ justifyContent: 'space-between' }}>
-            <span>{pattern.zh} <span className="muted">{pattern.en}</span></span>
-            <input style={{ width: 72 }} type="number" value={rules.values?.[pattern.id] as number ?? pattern.value} onChange={(e) => setRules({ ...rules, values: { ...rules.values, [pattern.id]: Number(e.target.value) } })} />
-          </label>
-        ))}
+        {shown.slice(0, 40).map((pattern) => {
+          const shapes = rules.shapes?.[pattern.id] ?? pattern.shapes
+          const chicken = rules.chicken?.[pattern.id] ?? pattern.blocksChicken
+          const removed = new Set((rules.removeExclusions ?? []).filter(([from]) => from === pattern.id).map(([, to]) => to))
+          const added = (rules.addExclusions ?? []).filter(([from]) => from === pattern.id).map(([, to]) => to)
+          const edges = [...pattern.excludes.filter((id) => !removed.has(id)), ...added]
+          return (
+            <div key={pattern.id}>
+              <label className="row" style={{ justifyContent: 'space-between' }}>
+                <button type="button" onClick={() => setOpenId(openId === pattern.id ? null : pattern.id)}>{pattern.zh} <span className="muted">{pattern.en}</span></button>
+                <input style={{ width: 72 }} type="number" aria-label={`${pattern.zh} value`} value={rules.values?.[pattern.id] as number ?? pattern.value} onChange={(e) => setRules({ ...rules, values: { ...rules.values, [pattern.id]: Number(e.target.value) } })} />
+              </label>
+              {openId === pattern.id && (
+                <div className="card">
+                  <div className="row">
+                    {(['normal', 'orphans', 'unrelated', 'eight'] as const).map((shape) => (
+                      <button key={shape} className={shapes.includes(shape) ? 'on' : ''} onClick={() => {
+                        const next = shapes.includes(shape) ? shapes.filter((item) => item !== shape) : [...shapes, shape]
+                        setRules({ ...rules, shapes: { ...rules.shapes, [pattern.id]: next } })
+                      }}>{shape}</button>
+                    ))}
+                    <button className={chicken ? 'on' : ''} onClick={() => setRules({ ...rules, chicken: { ...rules.chicken, [pattern.id]: !chicken } })}>{chicken ? 'Blocks chicken' : 'Chicken allowed'}</button>
+                  </div>
+                  <p className="muted">Replaces {edges.join(', ') || 'nothing'}</p>
+                  <div className="row">
+                    <select aria-label="Exclusion target" value={edge} onChange={(e) => setEdge(e.target.value)}>
+                      {CATALOG.map((item) => <option key={item.id} value={item.id}>{item.zh}</option>)}
+                    </select>
+                    <button onClick={() => setRules({ ...rules, addExclusions: [...(rules.addExclusions ?? []), [pattern.id, edge]] })}>Add edge</button>
+                    {edges.map((target) => <button key={target} onClick={() => setRules({ ...rules, removeExclusions: [...(rules.removeExclusions ?? []), [pattern.id, target]] })}>Drop {target}</button>)}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {qr && <img src={qr} alt="Rule link QR" width={220} height={220} />}
+        <article className="rules-print">
+          <h1>{rules.name} reference</h1>
+          {Array.from(new Set(CATALOG.map((p) => p.family))).map((family) => (
+            <section key={family}>
+              <h2>{family}</h2>
+              {CATALOG.filter((p) => p.family === family).map((p) => (
+                <p key={p.id}><b>{p.zh}</b> {p.en} · {String(rules.values?.[p.id] ?? p.value)} · replaces {(p.excludes ?? []).join(', ') || '—'}</p>
+              ))}
+            </section>
+          ))}
+        </article>
         {shown.length > 40 && <p className="muted">Showing 40 of {shown.length}. Search to narrow.</p>}
       </div>
     </div>

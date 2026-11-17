@@ -16,7 +16,31 @@ export function LedgerPage() {
   const [selfDraw, setSelfDraw] = useState(false)
   const [discarder, setDiscarder] = useState('')
   const [toast, setToast] = useState('')
+  const [view, setView] = useState<'table' | 'stats' | 'patterns' | 'history'>('table')
+  const [patterns, setPatterns] = useState<{ id: string; nameZh: string; tai: number; count: number }[]>([])
+  const [multi, setMulti] = useState<'none' | 'double' | 'triple'>('none')
+  const [bonusName, setBonusName] = useState('特別')
+  const [bonusAmount, setBonusAmount] = useState('5')
+  const [bonusMode, setBonusMode] = useState<'reward' | 'penalty' | 'transfer'>('reward')
+  const [bonusFrom, setBonusFrom] = useState('')
+  const [bonusTo, setBonusTo] = useState('')
+  const [subName, setSubName] = useState('')
   useEffect(() => { localStorage.setItem(KEY, JSON.stringify(store)) }, [store])
+  useEffect(() => {
+    const raw = sessionStorage.getItem('mjwaits.pendingWin')
+    if (!raw) return
+    sessionStorage.removeItem('mjwaits.pendingWin')
+    try {
+      const pending = JSON.parse(raw) as { winnerId: string; selfDraw: boolean; farn: number; multi: 'none' | 'double' | 'triple'; patterns: { id: string; nameZh: string; tai: number; count: number }[] }
+      setFarn(String(pending.farn))
+      setSelfDraw(pending.selfDraw)
+      setMulti(pending.multi)
+      setPatterns(pending.patterns ?? [])
+      setSheet(pending.winnerId)
+    } catch {
+      setToast('The scored hand could not be opened in the ledger.')
+    }
+  }, [])
   const state = useMemo(() => replayLedger(store.events.slice(0, store.cursor)), [store])
   function push(event: LedgerEvent) {
     const events = [...store.events.slice(0, store.cursor), event]
@@ -64,12 +88,21 @@ export function LedgerPage() {
           const index = store.cursor - list.length + i
           return <button key={index} onClick={() => setStore({ ...store, cursor: index + 1 })}>{event.type}</button>
         })}
+        <div className="seg">
+          <button className={view === 'table' ? 'on' : ''} onClick={() => setView('table')}>Table</button>
+          <button className={view === 'stats' ? 'on' : ''} onClick={() => setView('stats')}>Stats</button>
+          <button className={view === 'patterns' ? 'on' : ''} onClick={() => setView('patterns')}>Patterns</button>
+          <button className={view === 'history' ? 'on' : ''} onClick={() => setView('history')}>History</button>
+        </div>
         <button onClick={() => push({ type: 'draw' })}>流局</button>
         <button onClick={() => { const id = state.players[0]?.id; if (id) push({ type: 'surrender', playerId: id }) }}>投降</button>
         <button onClick={() => { const ids = state.players.map((p) => p.id); if (ids.length >= 3) push({ type: 'multi', discarderId: ids[0], winners: [{ id: ids[1], farn: Number(farn) || 0 }, { id: ids[2], farn: Number(farn) || 0 }] }) }}>一炮多響</button>
-        <button onClick={() => { const id = state.players[0]?.id; if (id) push({ type: 'bonus', label: '花', mode: 'reward', playerId: id, amount: 5 }) }}>花獎</button>
+        <button onClick={() => setSheet('bonus')}>獎罰</button>
         <button onClick={() => setSheet('settle')}>新局</button>
       </div>
+      {view === 'stats' && <Stats state={state} />}
+      {view === 'patterns' && <Patterns state={state} />}
+      {view === 'history' && <History store={store} onPick={(cursor) => setStore({ ...store, cursor })} />}
       <Chart store={store} />
       {state.players.length > 1 && (
         <div className="card">
@@ -88,8 +121,14 @@ export function LedgerPage() {
               {!selfDraw && state.players.filter((p) => p.id !== sheet).map((p) => <button key={p.id} className={discarder === p.id ? 'on' : ''} onClick={() => setDiscarder(p.id)}>{p.name}</button>)}
             </div>
             <input value={farn} onChange={(e) => setFarn(e.target.value.replace(/[^\d]/g, ''))} aria-label="farn" style={{ fontSize: 22, width: '100%', margin: '0.5rem 0' }} />
-            <p>底 {state.settings.base} · 番 {farn} · 高分 {Number(farn) >= state.settings.highScore ? 'yes' : 'no'}</p>
-            <button className="primary" onClick={() => { push({ type: 'win', winnerId: sheet, selfDraw, discarderId: selfDraw ? undefined : discarder, farn: Number(farn) || 0, takeJackpot: state.pot > 0 }); setSheet(null) }}>Record</button>
+            <p>底 {state.settings.base} · 番 {farn} · 高分 {Number(farn) >= state.settings.highScore ? 'yes' : 'no'} · {multi === 'none' ? '' : multi}</p>
+            {patterns.length > 0 && <p className="muted">{patterns.map((p) => `${p.nameZh} ${p.tai}`).join(' · ')}</p>}
+            <button className="primary" onClick={() => { push({ type: 'win', winnerId: sheet, selfDraw, discarderId: selfDraw ? undefined : discarder, farn: Number(farn) || 0, multi, takeJackpot: state.pot > 0, patterns }); setPatterns([]); setSheet(null) }}>Record</button>
+            <div className="row">
+              {state.players.filter((p) => p.id !== sheet).map((p) => <button key={p.id} onClick={() => push({ type: 'swap', a: sheet, b: p.id })}>Swap {p.name}</button>)}
+            </div>
+            <input aria-label="Substitute name" value={subName} placeholder="New player" onChange={(e) => setSubName(e.target.value)} />
+            <button onClick={() => { const name = subName.trim(); if (!name) return; push({ type: 'substitute', outId: sheet, player: { id: `p${Date.now().toString(36)}`, name } }); setSubName(''); setSheet(null) }}>Substitute</button>
           </div>
         </div>
       )}
@@ -103,6 +142,7 @@ export function LedgerPage() {
           </div>
         </div>
       )}
+      {sheet === 'bonus' && <Bonus state={state} name={bonusName} amount={bonusAmount} mode={bonusMode} from={bonusFrom} to={bonusTo} onName={setBonusName} onAmount={setBonusAmount} onMode={setBonusMode} onFrom={setBonusFrom} onTo={setBonusTo} onPush={push} onClose={() => setSheet(null)} />}
       {sheet === 'settings' && <Settings settings={state.settings} onSave={(settings) => { push({ type: 'settings', settings }); setSheet(null) }} onClose={() => setSheet(null)} />}
       {toast && <div className="toast" onClick={() => setToast('')}>{toast}</div>}
       {state.seatPrompt && <p className="card">執位提示 · the north round is finished.</p>}
@@ -126,7 +166,105 @@ function Seat({ id, state, color, onClick }: { id?: string; state: ReturnType<ty
 }
 
 function nameOf(state: ReturnType<typeof replayLedger>, id: string) {
-  return state.players.find((p) => p.id === id)?.name ?? id
+  return state.roster.find((p) => p.id === id)?.name ?? state.players.find((p) => p.id === id)?.name ?? id
+}
+
+const BONUS_KEYS: [string, string][] = [
+  ['flower', '花'],
+  ['grass', '草'],
+  ['both', '花草'],
+  ['concealedKong', '暗槓'],
+  ['chase5', '追5'],
+  ['chase10', '追10'],
+  ['snake', '蛇骰'],
+  ['box', '圍骰'],
+  ['sevenRobOne', '7搶1'],
+  ['oneRobSeven', '1搶7'],
+  ['eightImmortals', '八仙過海'],
+  ['falseCall', '嗌錯'],
+]
+
+function Stats({ state }: { state: ReturnType<typeof replayLedger> }) {
+  const ids = state.roster.map((p) => p.id)
+  return (
+    <div className="card">
+      <h2>每人 / 對戰</h2>
+      {state.roster.map((p) => (
+        <p key={p.id}>{p.name} {state.seatOrder.includes(p.id) ? '' : '(left)'} net {state.nets[p.id] ?? 0} · wins {state.wins[p.id] ?? 0} · 投降 {state.surrenderCounts[p.id] ?? 0}{state.winds[p.id] ? ` · ${['', '東', '南', '西', '北'][state.winds[p.id]]}` : ''}</p>
+      ))}
+      {ids.flatMap((from) => ids.filter((to) => (state.paid[from]?.[to] ?? 0) !== 0).map((to) => (
+        <p key={`${from}${to}`} className="muted">{nameOf(state, from)} paid {nameOf(state, to)} {state.paid[from][to]}</p>
+      )))}
+    </div>
+  )
+}
+
+function Patterns({ state }: { state: ReturnType<typeof replayLedger> }) {
+  const rows = state.roster.flatMap((p) => Object.entries(state.patternCounts[p.id] ?? {}).map(([id, count]) => ({ name: p.name, id, count })))
+  return (
+    <div className="card">
+      <h2>番種</h2>
+      {rows.length === 0 && <p className="muted">Record a scored hand to tally the patterns it used.</p>}
+      {rows.map((row) => <p key={`${row.name}${row.id}`}>{row.name} · {row.id} · {row.count}</p>)}
+    </div>
+  )
+}
+
+function History({ store, onPick }: { store: Store; onPick: (cursor: number) => void }) {
+  return (
+    <div className="card">
+      <h2>全程</h2>
+      {store.events.slice(0, store.cursor).map((event, index) => (
+        <button key={index} onClick={() => onPick(index + 1)}>{index + 1}. {event.type}{event.type === 'win' ? ` ${event.farn}` : ''}{event.type === 'bonus' ? ` ${event.label} ${event.amount}` : ''}</button>
+      ))}
+    </div>
+  )
+}
+
+function Bonus({ state, name, amount, mode, from, to, onName, onAmount, onMode, onFrom, onTo, onPush, onClose }: {
+  state: ReturnType<typeof replayLedger>
+  name: string
+  amount: string
+  mode: 'reward' | 'penalty' | 'transfer'
+  from: string
+  to: string
+  onName: (v: string) => void
+  onAmount: (v: string) => void
+  onMode: (v: 'reward' | 'penalty' | 'transfer') => void
+  onFrom: (v: string) => void
+  onTo: (v: string) => void
+  onPush: (event: LedgerEvent) => void
+  onClose: () => void
+}) {
+  const seated = state.players
+  const recipient = from || seated[0]?.id || ''
+  return (
+    <div className="sheet-back" onClick={onClose}>
+      <div className="sheet" onClick={(e) => e.stopPropagation()}>
+        <h2>獎罰</h2>
+        {BONUS_KEYS.map(([key, label]) => (
+          <button key={key} onClick={() => { if (!recipient) return; onPush({ type: 'bonus', label, mode: 'reward', playerId: recipient, amount: state.settings.bonuses[key] ?? 0 }); onClose() }}>{label} {state.settings.bonuses[key] ?? 0} to {nameOf(state, recipient)}</button>
+        ))}
+        <div className="row">
+          <button className={mode === 'reward' ? 'on' : ''} onClick={() => onMode('reward')}>Everyone pays</button>
+          <button className={mode === 'penalty' ? 'on' : ''} onClick={() => onMode('penalty')}>Pays everyone</button>
+          <button className={mode === 'transfer' ? 'on' : ''} onClick={() => onMode('transfer')}>From / to</button>
+        </div>
+        <input aria-label="Bonus label" value={name} onChange={(e) => onName(e.target.value)} />
+        <input aria-label="Bonus amount" value={amount} onChange={(e) => onAmount(e.target.value.replace(/[^\d]/g, ''))} />
+        <div className="row">
+          {seated.map((p) => <button key={p.id} className={from === p.id ? 'on' : ''} onClick={() => onFrom(p.id)}>{p.name}</button>)}
+        </div>
+        {mode === 'transfer' && <div className="row">{seated.map((p) => <button key={p.id} className={to === p.id ? 'on' : ''} onClick={() => onTo(p.id)}>{p.name}</button>)}</div>}
+        <button className="primary" onClick={() => {
+          const value = Number(amount) || 0
+          if (mode === 'transfer') onPush({ type: 'bonus', label: name || 'transfer', mode, amount: value, fromId: from || seated[0]?.id, toId: to || seated[1]?.id })
+          else onPush({ type: 'bonus', label: name || 'bonus', mode, amount: value, playerId: from || seated[0]?.id })
+          onClose()
+        }}>Record bonus</button>
+      </div>
+    </div>
+  )
 }
 
 function shareSettlement(state: ReturnType<typeof replayLedger>) {
@@ -186,7 +324,7 @@ function Chart({ store }: { store: Store }) {
           return <polyline key={name} fill="none" stroke={colors[player % colors.length]} strokeWidth="2" points={pts} />
         })}
       </svg>
-      <p className="muted">{series.names.join(' · ')}</p>
+      <p className="muted">{series.names.join(' · ')} · each point is the running total, crossed at zero</p>
     </div>
   )
 }
@@ -205,6 +343,9 @@ function Settings({ settings, onSave, onClose }: { settings: LedgerSettings; onS
         <label>反雪 雙響 <input type="number" value={draft.counterSnowDouble} onChange={(e) => setDraft({ ...draft, counterSnowDouble: Number(e.target.value) })} /></label>
         <label>反雪 三響 <input type="number" value={draft.counterSnowTriple} onChange={(e) => setDraft({ ...draft, counterSnowTriple: Number(e.target.value) })} /></label>
         <label>Jackpot <input type="number" value={draft.jackpotPerDraw} onChange={(e) => setDraft({ ...draft, jackpotPerDraw: Number(e.target.value), jackpotEnabled: Number(e.target.value) > 0 })} /></label>
+        {BONUS_KEYS.map(([key, label]) => (
+          <label key={key}>{label} <input type="number" value={draft.bonuses?.[key] ?? 0} onChange={(e) => setDraft({ ...draft, bonuses: { ...draft.bonuses, [key]: Number(e.target.value) || 0 } })} /></label>
+        ))}
         <button className="primary" onClick={() => onSave(draft)}>Save</button>
         <p className="muted">{roundLabel(1, 0)} is the opening label. 詐胡 preset {draft.falseWinPenalty}.</p>
       </div>

@@ -22,7 +22,8 @@ export function App() {
   useEffect(() => {
     const apply = () => {
       const params = new URLSearchParams(location.hash.replace(/^#/, ''))
-      if (params.get('w')) setTab('waits')
+      if (location.hash === '#ledger') setTab('ledger')
+      else if (params.get('w')) setTab('waits')
       else if (params.get('t') || params.get('r')) setTab('scoring')
     }
     apply()
