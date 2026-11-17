@@ -158,14 +158,24 @@ export function ScoringPage() {
             ))}
           </div>
         )}
-        <div className="tiles" style={{ marginTop: 8 }}>
-          {(layout === 'classic' || group === '花') && FLOWERS.map((name, i) => <Picker key={name} kind={`${i + 1}f`} label={name} dead={flowers.includes(`${i + 1}f`)} onAdd={addKind} />)}
-          {(layout === 'classic' || group === '花') && SEASONS.map((name, i) => <Picker key={name} kind={`${i + 1}s`} label={name} dead={flowers.includes(`${i + 1}s`)} onAdd={addKind} />)}
-          {(layout === 'classic' || group === '字') && HONORS.map((name, i) => <Picker key={name} kind={`${i + 1}z`} label={name} dead={countKind(`${i + 1}z`) >= 4} onAdd={addKind} />)}
+        <div className="picker-groups">
+          {(layout === 'classic' || group === '花') && (
+            <div className="suit-row eight">
+              {FLOWERS.map((name, i) => <Picker key={name} kind={`${i + 1}f`} label={name} dead={flowers.includes(`${i + 1}f`)} onAdd={addKind} />)}
+              {SEASONS.map((name, i) => <Picker key={name} kind={`${i + 1}s`} label={name} dead={flowers.includes(`${i + 1}s`)} onAdd={addKind} />)}
+            </div>
+          )}
+          {(layout === 'classic' || group === '字') && (
+            <div className="suit-row eight">
+              {HONORS.map((name, i) => <Picker key={name} kind={`${i + 1}z`} label={name} dead={countKind(`${i + 1}z`) >= 4} onAdd={addKind} />)}
+              <Picker kind="j" label="Joker" dead={false} onAdd={addKind} />
+            </div>
+          )}
           {(layout === 'classic' ? SUITS : SUITS.filter(([s]) => group === s)).map(([suit, label]) => (
-            Array.from({ length: 9 }, (_, n) => <Picker key={`${suit}${n}`} kind={`${n + 1}${suit}`} label={`${n + 1}${label}`} dead={countKind(`${n + 1}${suit}`) >= 4} onAdd={addKind} />)
+            <div className="suit-row nine" key={suit}>
+              {Array.from({ length: 9 }, (_, n) => <Picker key={`${suit}${n}`} kind={`${n + 1}${suit}`} label={`${n + 1}${label}`} dead={countKind(`${n + 1}${suit}`) >= 4} onAdd={addKind} />)}
+            </div>
           ))}
-          <Picker kind="j" label="Joker" dead={false} onAdd={addKind} />
         </div>
         {pending.length > 0 && <p className="muted">Building meld: {pending.join(' ')}</p>}
       </div>

@@ -50,7 +50,12 @@ export function App() {
     <>
       <div className="page">
         <header className="head">
-          <div className="logo" aria-hidden="true"><Icon name="scoring" size={26} /></div>
+          <div className="logo" aria-hidden="true">
+            <svg className="logo-mark" viewBox="0 0 44 44" aria-hidden="true">
+              <rect x="7" y="8" width="16" height="22" rx="2.5" fill="rgba(255,255,255,0.28)" stroke="#fff" strokeWidth="1.4" />
+              <rect x="18" y="14" width="16" height="22" rx="2.5" fill="rgba(255,255,255,0.72)" stroke="#fff" strokeWidth="1.4" />
+            </svg>
+          </div>
           <div>
             <h1>MJWaits</h1>
             <p>HKTW mahjong scoring, waits & trainer</p>
