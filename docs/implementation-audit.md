@@ -2,7 +2,9 @@
 
 The numbers below are from the run that produced this file. Do not treat an older sentence in git history as the current result. This build is not claimed production-ready.
 
-`npx tsc -b --noEmit` passed. `npm test` passed 362 tests. `npm run build` is recorded in the commit that follows this note if the build log says it succeeded.
+`npx tsc -b --pretty false --noEmit` passed. `npm test` passed 362 tests. GitHub Actions on the merged pull request ran the same typecheck, the test suite, and `npm run build`.
+
+Pull request 1 is merged. Pages for this repository still publishes the main branch; changing that source returned 403, so the workflow commits the built `dist` back to main. The verified URL is https://app.kevinlhc.com/mjgrok/ . A loaded hand there scored 71, a tile image decoded, and the service worker script is `https://app.kevinlhc.com/mjgrok/sw.js`. No CNAME file was added and DNS was not changed. This is not a production-ready claim: discard ranking is still about a second on a cold hand, and the printed reference is the pattern list with example tiles rather than a typeset PDF.
 
 ## Complete
 
