@@ -103,7 +103,7 @@ img { max-width: 100%; }
 .logo svg { width: 26px; height: 26px; }
 .head h1 { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; margin: 0; line-height: 1.1; }
 .head p { margin: 0; color: var(--text-muted); font-size: 15px; }
-.wide-nav { display: none; }
+nav.wide-nav { display: none; }
 
 .card { background: var(--surface); border-radius: var(--radius-card); padding: 1rem; margin: 0.75rem 0; }
 .card h2 { margin: 0; font-size: 17px; font-weight: 600; }
@@ -178,7 +178,7 @@ img { max-width: 100%; }
 }
 @media (min-width: 701px) {
   .phone-nav { display: none; }
-  .wide-nav { display: flex; margin: 0.5rem 0 0.75rem; }
+  nav.wide-nav { display: flex; margin: 0.5rem 0 0.75rem; }
   .page { padding-bottom: 1.25rem; }
   .sheet-back { align-items: center; }
   .sheet { border-radius: var(--radius-sheet); }

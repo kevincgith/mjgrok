@@ -20,9 +20,14 @@ const wide: { id: Tab; label: string; icon: string }[] = [
 export function App() {
   const [tab, setTab] = useState<Tab>('scoring')
   useEffect(() => {
-    const params = new URLSearchParams(location.hash.replace(/^#/, ''))
-    if (params.get('w')) setTab('waits')
-    else if (params.get('t') || params.get('r')) setTab('scoring')
+    const apply = () => {
+      const params = new URLSearchParams(location.hash.replace(/^#/, ''))
+      if (params.get('w')) setTab('waits')
+      else if (params.get('t') || params.get('r')) setTab('scoring')
+    }
+    apply()
+    window.addEventListener('hashchange', apply)
+    return () => window.removeEventListener('hashchange', apply)
   }, [])
   const [more, setMore] = useState(false)
   const [wideScreen, setWide] = useState(false)

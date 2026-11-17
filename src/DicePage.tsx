@@ -108,7 +108,12 @@ function Seats() {
   const reader = (realEast + secondThrow - 1) % 4
   const fromTwo = secondThrow % 2 === 0
   const windStart = fromTwo ? order.indexOf(5) : order.indexOf(4)
-  const winds = [0, 1, 2, 3].map((n) => TILES[order[(windStart + n) % 6]] ?? '東')
+  const winds: string[] = []
+  for (let n = 1; n <= 6 && winds.length < 4; n++) {
+    const label = TILES[order[(windStart + n) % 6]]
+    if (label === '一筒' || label === '二筒') continue
+    winds.push(label)
+  }
   useEffect(() => {
     if (!running) return
     const delay = step === 0 || step === 2 ? 1400 : 1000
