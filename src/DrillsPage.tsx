@@ -165,7 +165,12 @@ function Endless() {
   const live = hand.length ? hand : wall.slice(0, 16)
   const model = useMemo(() => ({ concealed: live, declared: [], flowers: [] }), [live])
   const now = shanten(model)
-  const analysis = useDiscards(model, hand.length > 0 && winTurn === null, 5)
+  const thrown = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const tile of pile) map[kindOfTile(tile)] = (map[kindOfTile(tile)] ?? 0) + 1
+    return map
+  }, [pile])
+  const analysis = useDiscards(model, hand.length > 0 && winTurn === null, 5, thrown)
   useEffect(() => { localStorage.setItem(ENDLESS_KEY, JSON.stringify(stats)) }, [stats])
   useEffect(() => {
     if (hand.length) return
