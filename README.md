@@ -23,6 +23,7 @@ python3 scripts/fetch-tiles.py
 ## Ambiguities
 
 - Shanten `-1` means the hand is already won. `0` means tenpai. Declared melds shrink the concealed checkpoint by 3 tiles each. A hand with no declarations that sits on 4, 7, 10, or 13 tiles is treated as a short puzzle, which is what the drills use.
+- At a checkpoint that is not yet tenpai, the next action is a draw and then a discard. The waits page lists every useful draw, the discard that follows, and the waits of the hand you keep. Discard efficiency is the other order: throw one tile first. The short hand is not tenpai. Each listed draw repairs it, and the waits belong to that repaired hand. One past a checkpoint, every discard is ranked. A tenpai discard lists its waits. Any other discard lists every later useful draw, not a capped first eight. Percentages stay estimates. A tile you throw, a declared kong, and a kind marked already discarded stay out of the wall. Jokers in hand can be discarded; a joker is not given a 4-copy draw count.
 - Eight pairs and an ordinary 5-meld reading of the same 17 tiles are both scored. The total is the sum.
 - 小三風 is two or more wind pungs plus a wind pair that is not already a pung. 小四喜 replaces it when three wind pungs and the missing wind pair are both present.
 - 假獨 still recognises a kanchan, penchan, or tanki on a chow that was not declared, even after that chow is marked 明 because the winning tile completed it.

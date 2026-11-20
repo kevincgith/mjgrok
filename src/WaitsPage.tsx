@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { findWaits, formatNotation, parseNotation, scoreHand, shanten, type Tile } from '@mjwaits/shared'
+import { findWaits, formatNotation, parseNotation, scoreHand, shanten, type Tile, type TwoStep } from '@mjwaits/shared'
 import { Icon, TileFace } from './ui'
 import { useDiscards } from './lib/useDiscards'
 
@@ -81,19 +81,54 @@ export function WaitsPage() {
         </div>
       )}
       {result.shanten < 0 && <div className="card"><h2>Winning hand</h2><p>This hand is already complete.</p></div>}
+      {discards.nextDraws && (
+        <div className="card">
+          <h2>Next draw</h2>
+          <p className="muted">The next action is a draw, then a discard. Each line is a useful draw, the tile thrown after it, and the waits of the hand you keep. {discards.pending ? 'Working…' : discards.elapsedMs ? `Worker ${discards.elapsedMs} ms` : ''}</p>
+          {discards.error && <p className="bad">{discards.error}</p>}
+          {!discards.pending && discards.nextDraws.length === 0 && <p>No draw improves this hand in one exchange.</p>}
+          <StepList steps={discards.nextDraws} />
+        </div>
+      )}
       {needDiscards && (
         <div className="card">
           <h2>{result.atCheckpoint ? 'Discard efficiency' : 'Discard options'}</h2>
-          <p className="muted">Percentages are an estimate over the next self-draws, not an exact probability. {discards.pending ? 'Working…' : discards.elapsedMs ? `Worker ${discards.elapsedMs} ms` : ''}</p>
-          {discards.error && <p className="bad">{discards.error}</p>}
+          <p className="muted">{result.atCheckpoint
+            ? 'Throwing one tile first leaves a short hand. That hand is not tenpai. Each draw below repairs it, and any waits belong to the repaired checkpoint hand.'
+            : 'A tenpai discard lists the waits you keep. Any other discard lists every later draw that improves it, the discard after that draw, and the waits you keep.'} Percentages are an estimate, not an exact probability. {discards.nextDraws ? '' : discards.pending ? 'Working…' : discards.elapsedMs ? `Worker ${discards.elapsedMs} ms` : ''}</p>
+          {discards.error && !discards.nextDraws && <p className="bad">{discards.error}</p>}
           {discards.rows.map((row) => (
-            <p key={row.discard}><b>{row.discard}</b> tenpai {row.tenpaiPercent}% win {row.winPercent}% shanten {row.shanten}</p>
+            <div key={row.discard}>
+              <p><b>{row.discard}</b> tenpai {row.tenpaiPercent}% win {row.winPercent}% shanten {row.shanten}</p>
+              {row.waits.length > 0 && <p className="muted">Waits {row.waits.map((w) => `${w.kind}×${w.remaining}`).join(', ')}</p>}
+              {row.twoStep.length > 0 && <StepList steps={row.twoStep} />}
+            </div>
           ))}
         </div>
       )}
       {toast && <div className="toast" onClick={() => setToast('')}>{toast}</div>}
     </section>
   )
+}
+
+function StepList({ steps }: { steps: TwoStep[] }) {
+  const [open, setOpen] = useState(false)
+  const limit = 6
+  const shown = open ? steps : steps.slice(0, limit)
+  return (
+    <>
+      {shown.map((step) => <p key={`${step.draw}:${step.discard ?? ''}`} className="muted">{describeStep(step)}</p>)}
+      {steps.length > limit && <button onClick={() => setOpen((value) => !value)}>{open ? 'Show fewer draws' : `Show all ${steps.length} draws`}</button>}
+    </>
+  )
+}
+
+function describeStep(step: TwoStep): string {
+  const waits = step.waits.map((w) => `${w.kind}×${w.remaining}`).join(', ')
+  if (step.shanten < 0) return `Draw ${step.draw} ×${step.remaining} wins`
+  const thrown = step.discard ? ` → discard ${step.discard}` : ''
+  const kept = step.waits.length ? ` → ${waits}` : step.shanten <= 0 ? ' → tenpai, no copies left' : ' → not tenpai yet'
+  return `Draw ${step.draw} ×${step.remaining}${thrown}${kept} · shanten ${step.shanten}`
 }
 
 function toTile(kind: string): Tile {
