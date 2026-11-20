@@ -416,3 +416,27 @@ export function shantenOfCounts(counts: number[], jokers: number, meldsNeeded: n
   const checkpoint = meldsNeeded * 3 + 1
   return shantenCounts(counts, jokers, meldsNeeded, checkpoint, meldsNeeded === 5)
 }
+
+/**
+ * Shanten after the best single discard from a just-drawn count (checkpoint+1 tiles).
+ * Stops once a discard at or below `limit` is found. A returned value <= limit is a
+ * real discard's shanten, so the true minimum is at most that value. A finished
+ * search is the exact minimum. Nothing partial is cached as the hand's shanten.
+ */
+export function shantenByBestDiscard(counts: number[], jokers: number, need: number, checkpoint: number, specials: boolean, limit = -1): number {
+  if (isCompleteCounts(counts, jokers, need, specials)) return -1
+  let best = 8
+  for (let i = 0; i < 34; i++) {
+    if (!counts[i]) continue
+    counts[i] -= 1
+    const next = shantenCounts(counts, jokers, need, checkpoint, specials)
+    counts[i] += 1
+    if (next < best) best = next
+    if (best <= limit) return best
+  }
+  if (jokers > 0) {
+    const next = shantenCounts(counts, jokers - 1, need, checkpoint, specials)
+    if (next < best) best = next
+  }
+  return best
+}
