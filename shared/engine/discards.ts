@@ -1,11 +1,11 @@
-import { findWaits } from './waits.ts'
-import { shanten } from './shanten.ts'
+import { isCompleteCounts, shanten, shantenByBestDiscard } from './shanten.ts'
 import {
   KIND_COUNT,
   type Hand,
   type Kind,
   type Tile,
   countsOf,
+  declaredCounts,
   indexKind,
   inferTarget,
   kindOf,
@@ -18,6 +18,8 @@ export interface DiscardOptions {
   /** Self-draws still to come. The estimate never claims to be an exact probability. */
   drawsLeft?: number
   meldsNeeded?: number
+  /** Return no rows once this becomes true, so a stale worker request can stop. */
+  aborted?: () => boolean
 }
 
 export interface TileCount {
@@ -66,9 +68,10 @@ export function analyzeDiscards(hand: Hand, options?: DiscardOptions): DiscardAn
   const kinds = distinct(discardFrom)
   const rows: DiscardAnalysis[] = []
   for (const kind of kinds) {
+    if (options?.aborted?.()) return []
     const next = removeOne(hand, kind)
     if (!next) continue
-    rows.push(assess(next, kind, target.need, target.checkpoint, draws, removed))
+    rows.push(assess(next, kind, target.need, target.checkpoint, draws, removed, hand.declared.length === 0 && target.need === 5))
   }
   rows.sort((a, b) => b.winPercent - a.winPercent || b.tenpaiPercent - a.tenpaiPercent || b.accepting.length - a.accepting.length || a.discard.localeCompare(b.discard))
   return rows
@@ -81,21 +84,20 @@ function assess(
   checkpoint: number,
   draws: number,
   removed: Record<string, number>,
+  specials: boolean,
 ): DiscardAnalysis {
   const distance = shanten(hand, { meldsNeeded: need })
-  const { counts } = countsOf(hand.concealed)
+  const { counts, jokers } = countsOf(hand.concealed)
   const held = counts.slice()
+  const declared = declaredCounts(hand)
+  for (let i = 0; i < KIND_COUNT; i++) held[i] += declared[i]
   const unseenMap = unseen(held, removed)
   const unseenTotal = [...unseenMap.values()].reduce((s, n) => s + n, 0)
   let waits: TileCount[] = []
   let accepting: TileCount[] = []
   const twoStep: TwoStep[] = []
   if (hand.concealed.length === checkpoint && distance <= 0) {
-    const found = findWaits(hand, { meldsNeeded: need })
-    waits = found.waits
-      .filter((w) => w.kind !== 'j')
-      .map((w) => ({ kind: w.kind, remaining: Math.min(w.remaining, unseenMap.get(w.kind) ?? 0) }))
-      .filter((w) => w.remaining > 0)
+    waits = waitCounts(counts, jokers, need, specials, held, unseenMap)
     const winTiles = waits.reduce((s, w) => s + w.remaining, 0)
     const winPercent = percent(atLeastOne(winTiles, Math.min(draws, unseenTotal), unseenTotal))
     return {
@@ -113,18 +115,19 @@ function assess(
   if (hand.concealed.length === checkpoint) {
     for (let i = 0; i < KIND_COUNT; i++) {
       const left = unseenMap.get(indexKind(i)) ?? 0
-      if (left <= 0 || counts[i] >= 4) continue
-      const trial = add(hand, indexKind(i))
-      const after = shanten(trial, { meldsNeeded: need })
-      if (after < distance) {
+      if (left <= 0 || held[i] >= 4) continue
+      counts[i] += 1
+      const improved = shantenByBestDiscard(counts, jokers, need, checkpoint, specials, distance - 1) < distance
+      let after = distance
+      let nextWaits: TileCount[] = []
+      if (improved && twoStep.length < 8) {
+        after = shantenByBestDiscard(counts, jokers, need, checkpoint, specials, -1)
+        if (after <= 0) nextWaits = bestWaits(counts, jokers, need, specials, hand.declared, declared, unseenMap)
+      }
+      counts[i] -= 1
+      if (improved) {
         accepting.push({ kind: indexKind(i), remaining: left })
-        if (twoStep.length < 8) {
-          const nextWaits =
-            after <= 0 && trial.concealed.length === checkpoint + 1
-              ? bestWaits(trial, need, unseenMap)
-              : []
-          twoStep.push({ draw: indexKind(i), remaining: left, shanten: after, waits: nextWaits })
-        }
+        if (twoStep.length < 8) twoStep.push({ draw: indexKind(i), remaining: left, shanten: after, waits: nextWaits })
       }
     }
   }
@@ -148,24 +151,52 @@ function assess(
   }
 }
 
-function bestWaits(hand: Hand, need: number, unseenMap: Map<string, number>): TileCount[] {
-  let best: TileCount[] = []
-  const seen = new Set<string>()
-  for (const tile of hand.concealed) {
-    const kind = kindOf(tile)
-    if (seen.has(kind)) continue
-    seen.add(kind)
-    const next = removeOne(hand, kind)
-    if (!next) continue
-    if (shanten(next, { meldsNeeded: need }) > 0) continue
-    const found = findWaits(next, { meldsNeeded: need })
-    const waits = found.waits
-      .filter((w) => w.kind !== 'j')
-      .map((w) => ({ kind: w.kind, remaining: Math.min(w.remaining, unseenMap.get(w.kind) ?? 0) }))
-      .filter((w) => w.remaining > 0)
-    if (waits.reduce((s, w) => s + w.remaining, 0) > best.reduce((s, w) => s + w.remaining, 0)) best = waits
+function waitCounts(counts: number[], jokers: number, need: number, specials: boolean, held: number[], unseenMap: Map<string, number>): TileCount[] {
+  const waits: TileCount[] = []
+  for (let i = 0; i < KIND_COUNT; i++) {
+    if (counts[i] >= 4) continue
+    counts[i] += 1
+    const wins = isCompleteCounts(counts, jokers, need, specials)
+    counts[i] -= 1
+    if (!wins) continue
+    const kind = indexKind(i)
+    const remaining = Math.min(Math.max(0, 4 - held[i]), unseenMap.get(kind) ?? 0)
+    if (remaining > 0) waits.push({ kind, remaining })
   }
+  return waits
+}
+
+/** Waits after the tenpai discard that leaves the most tiles out. Same tiles findWaits would name, without building every meld. */
+function bestWaits(counts: number[], jokers: number, need: number, specials: boolean, melds: Hand['declared'], declared: number[], unseenMap: Map<string, number>): TileCount[] {
+  let best: TileCount[] = []
+  let bestTotal = -1
+  const consider = (nextJokers: number) => {
+    const distance = shanten(handFromCounts(counts, nextJokers, melds), { meldsNeeded: need })
+    if (distance > 0) return
+    const held = counts.slice()
+    for (let k = 0; k < KIND_COUNT; k++) held[k] += declared[k]
+    const waits = waitCounts(counts, nextJokers, need, specials, held, unseenMap)
+    const total = waits.reduce((s, w) => s + w.remaining, 0)
+    if (total > bestTotal) {
+      best = waits
+      bestTotal = total
+    }
+  }
+  for (let i = 0; i < KIND_COUNT; i++) {
+    if (!counts[i]) continue
+    counts[i] -= 1
+    consider(jokers)
+    counts[i] += 1
+  }
+  if (jokers > 0) consider(jokers - 1)
   return best
+}
+
+function handFromCounts(counts: number[], jokers: number, melds: Hand['declared']): Hand {
+  const concealed: Tile[] = []
+  for (let i = 0; i < KIND_COUNT; i++) for (let n = 0; n < counts[i]; n++) concealed.push(tileOf(indexKind(i)))
+  for (let n = 0; n < jokers; n++) concealed.push({ suit: 'j', rank: 0 })
+  return { concealed, declared: melds, flowers: [] }
 }
 
 function unseen(held: number[], removed: Record<string, number>): Map<string, number> {
@@ -223,8 +254,4 @@ function removeOne(hand: Hand, kind: Kind): Hand | null {
     ...hand,
     concealed: hand.concealed.filter((_, i) => i !== idx),
   }
-}
-
-function add(hand: Hand, kind: Kind): Hand {
-  return { ...hand, concealed: [...hand.concealed, tileOf(kind)] }
 }

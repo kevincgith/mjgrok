@@ -6,9 +6,19 @@ interface Request {
   meldsNeeded?: number
 }
 
+let latest = 0
+
 self.onmessage = (event: MessageEvent<Request>) => {
-  const started = performance.now()
-  const ranked = analyzeDiscards(event.data.hand, event.data.meldsNeeded ? { meldsNeeded: event.data.meldsNeeded } : undefined).slice(0, 8)
-  const elapsedMs = Math.round((performance.now() - started) * 10) / 10
-  self.postMessage({ id: event.data.id, ranked, elapsedMs })
+  latest = event.data.id
+  const id = event.data.id
+  const hand = event.data.hand
+  const meldsNeeded = event.data.meldsNeeded
+  setTimeout(() => {
+    if (latest !== id) return
+    const started = performance.now()
+    const ranked = analyzeDiscards(hand, { meldsNeeded, aborted: () => latest !== id })
+    if (latest !== id) return
+    const elapsedMs = Math.round((performance.now() - started) * 10) / 10
+    self.postMessage({ id, ranked: ranked.slice(0, 8), elapsedMs })
+  }, 0)
 }
